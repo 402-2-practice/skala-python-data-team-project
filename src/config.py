@@ -41,7 +41,7 @@ RAW_DATA_PATH = (
 )
 
 PROCESSED_DATA_PATH = (
-    PROCESSED_DIR / "adult_clean.csv"
+    PROCESSED_DIR / "adult_cleaned.csv"
 )
 
 REPORT_PATH = (
