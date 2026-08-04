@@ -487,30 +487,30 @@ def get_best_data_tool() -> str:
 
 
 # ============================================================
-# 11. 직접 실행
+# pandas/polars 비교 결과 출력을 위해 main.py에서 아래 코드 실행 요구
 # ============================================================
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
-    cleaned_df, comparison = (
-        run_data_pipeline()
-    )
+#     cleaned_df, comparison = (
+#         run_data_pipeline()
+#     )
 
-    print("\n" + "=" * 60)
-    print("[최종 결과]")
-    print("=" * 60)
+#     print("\n" + "=" * 60)
+#     print("[최종 결과]")
+#     print("=" * 60)
 
-    print(
-        f"가장 빠른 데이터 처리 도구: "
-        f"{comparison['best_tool']}"
-    )
+#     print(
+#         f"가장 빠른 데이터 처리 도구: "
+#         f"{comparison['best_tool']}"
+#     )
 
-    print(
-        f"\nPandas 로딩 시간: "
-        f"{comparison['pandas_seconds']}초"
-    )
+#     print(
+#         f"\nPandas 로딩 시간: "
+#         f"{comparison['pandas_seconds']}초"
+#     )
 
-    print(
-        f"Polars 로딩 시간: "
-        f"{comparison['polars_seconds']}초"
-    )
+#     print(
+#         f"Polars 로딩 시간: "
+#         f"{comparison['polars_seconds']}초"
+#     )
