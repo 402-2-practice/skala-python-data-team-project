@@ -51,9 +51,7 @@ def load_data_polars(
 
     df = pl.read_csv(
         path,
-        has_header=False,
-        new_columns=ADULT_COLUMNS,
-        null_values=" ?",
+        null_values="?",
     )
 
     elapsed = time.perf_counter() - start
@@ -96,7 +94,6 @@ def clean_data(
             cleaned[column]
             .replace(
                 {
-                    "?": pd.NA,
                     "": pd.NA,
                     "NA": pd.NA,
                     "N/A": pd.NA,
