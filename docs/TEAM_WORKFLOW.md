@@ -1,17 +1,18 @@
-# 4인 GitHub 병렬 협업 구조
+# 5인 GitHub 병렬 협업 구조
 
 ## 1. 역할 분담
 
-역할은 작업 단계가 아니라 변경 파일의 소유권으로 나눈다. 공통 계약이 정해진 뒤 네 담당자가 동시에 개발할 수 있다.
+역할은 작업 단계가 아니라 변경 파일의 소유권으로 나눈다. 공통 계약이 정해진 뒤 다섯 담당자가 동시에 개발할 수 있다.
 
 | 담당 | 책임 | 주 변경 파일 | 완료 조건 |
 |---|---|---|---|
 | A 데이터·EDA | Pandas/Polars 비교, 정제, 결측·중복, 기술통계 | `src/data.py`, `src/eda.py` | 정제 CSV와 EDA 표 생성 |
 | B 통계·PSM | 상관계수, Welch t-test, 매칭, 균형 진단 | `src/statistics.py` | 매칭 전후 결과와 해석 생성 |
 | C 시각화·보고서 | Seaborn, Plotly, report.md 자동화 | `src/visualization.py`, `src/report.py` | PNG·HTML·Markdown 생성 |
-| D ML·품질·통합 | sklearn Pipeline, 평가, 모델 저장, 전체 실행 검증 | `src/modeling.py`, `main.py` | joblib·지표 생성 및 전체 실행 성공 |
+| D ML 모델링 | sklearn Pipeline 학습, 평가지표, 모델 저장 | `src/modeling.py` | joblib·지표(Accuracy/Precision/Recall/F1/ROC-AUC) 생성 |
+| E 테스트·통합·문서 QA | pytest 단위테스트, CI 강화, 전체 실행 검증, README/문서 일관성, 제출 준비 | `tests/`, `main.py`, `.github/workflows/ci.yml`, `README.md` | pytest 전체 통과 + 전체 파이프라인 처음부터 성공 + 제출물 정리 |
 
-발표 자료와 최종 해석은 네 명이 공동 검토한다. D는 다른 사람의 구현을 대신하는 사람이 아니라 연결 규격과 전체 실행을 확인하는 담당자다.
+D는 모델 구축에 집중하고, E는 다른 사람의 구현을 대신하는 사람이 아니라 각 모듈이 약속한 계약대로 동작하는지 테스트로 증명하고 전체 실행과 문서 일관성을 확인하는 담당자다. 발표 자료와 최종 해석은 다섯 명이 공동 검토한다.
 
 ## 2. 공통 기능 소유권
 
@@ -30,7 +31,8 @@
 feat/data-eda
 feat/statistics-psm
 feat/visualization-report
-feat/modeling-integration
+feat/modeling
+feat/testing-qa
 ```
 
 추가 수정은 짧은 브랜치를 사용한다.
@@ -50,14 +52,16 @@ main: 초기 폴더·인터페이스 합의
   ├─ A feat/data-eda ───────────────┐
   ├─ B feat/statistics-psm ─────────┤
   ├─ C feat/visualization-report ───┤→ 각각 PR·리뷰·merge
-  └─ D feat/modeling-integration ───┘
+  └─ D feat/modeling ────────────────┘
                                       ↓
-                              integration/final-check
+                         E feat/testing-qa (각 모듈 단위테스트 작성)
+                                      ↓
+                              integration/final-check (E 담당)
                                       ↓
                          전체 실행·report 확인·발표 준비
 ```
 
-각 담당자는 `main`에서 브랜치를 만들고 자기 모듈을 개발한다. 다른 담당자의 결과 파일이 아직 없으면 문서에 정한 열 이름과 출력 파일명을 기준으로 작은 샘플 데이터나 임시 결과를 사용한다.
+각 담당자는 `main`에서 브랜치를 만들고 자기 모듈을 개발한다. 다른 담당자의 결과 파일이 아직 없으면 문서에 정한 열 이름과 출력 파일명을 기준으로 작은 샘플 데이터나 임시 결과를 사용한다. E는 A~D의 PR이 하나씩 merge될 때마다 해당 모듈의 테스트를 추가해나갈 수 있으며, 모든 PR이 끝나길 기다릴 필요는 없다.
 
 ## 5. Commit 규칙
 
@@ -96,11 +100,11 @@ PR을 만들기 전에:
 - `psm_sensitivity_result.json`
 - `model_metrics.json`
 
-마지막에는 D가 `integration/final-check` 브랜치에서 처음부터 전체 실행한다. 이 브랜치에는 새 분석 기능을 넣지 않고 연결 오류만 수정한다.
+마지막에는 E가 `integration/final-check` 브랜치에서 처음부터 전체 실행한다. 이 브랜치에는 새 분석 기능을 넣지 않고 연결 오류만 수정한다.
 
 ## 8. 충돌 방지 규칙
 
-- 모든 사람이 `main.py`를 수정하지 않는다. 단계 연결 변경은 D에게 요청한다.
+- 모든 사람이 `main.py`를 수정하지 않는다. 단계 연결 변경은 E에게 요청한다.
 - 모든 사람이 `data.py`를 수정하지 않는다. 데이터 계약 변경은 A의 PR에서 처리한다.
 - 원본 `adult.csv`, 생성 모델, 대용량 출력 파일은 Git에 커밋하지 않는다.
 - 그래프 파일 이름과 테이블 파일 이름은 문서에 정한 이름을 유지한다.
@@ -110,6 +114,7 @@ PR을 만들기 전에:
 
 - 새 가상환경에서 `pip install -r requirements.txt`가 성공한다.
 - `python main.py` 한 번으로 전처리부터 report.md까지 생성된다.
+- `pytest`가 전부 통과한다.
 - Pandas와 Polars 결과 행 수가 일치한다.
 - Seaborn PNG와 Plotly HTML이 각각 하나 이상 생성된다.
 - t-test의 p-value와 해석이 report에 포함된다.
