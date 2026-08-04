@@ -104,12 +104,15 @@ RANDOM_STATE = 42
 # 분석 기준
 # ============================================================
 
-COLLEGE_DEGREES = [
-    "Bachelors",
-    "Masters",
-    "Prof-school",
-    "Doctorate"
-]
+#포함 여부만 검사
+COLLEGE_DEGREES = frozenset(
+    {
+        "Bachelors",
+        "Masters",
+        "Prof-school",
+        "Doctorate",
+    }
+)
 
 
 # ============================================================
