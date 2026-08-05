@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 import src.modeling as modeling
-from src.modeling import train_income_model
+from src.modeling import predict_income, train_income_model
 
 
 def test_train_income_model_produces_expected_metrics_and_artifacts():
@@ -54,3 +54,28 @@ def test_train_income_model_excludes_leakage_columns():
     metrics = train_income_model(df)
 
     assert metrics["accuracy"] < 1.0
+
+
+def test_reloaded_model_matches_original_predictions():
+    """joblib으로 저장한 파이프라인을 다시 불러왔을 때 원본과 동일한 확률을 내는지 확인한다.
+
+    저장 자체는 성공해도 재로딩 후 예측이 미묘하게 달라지는 경우(예: 범주형 dtype이
+    직렬화 과정에서 깨지는 것)를 이 비교가 없으면 못 잡는다.
+    """
+    rng = np.random.default_rng(3)
+    n = 150
+    age = rng.integers(20, 65, size=n)
+    sex = rng.choice(["Male", "Female"], size=n)
+    high_income = (age > 40).astype(int)
+    df = pd.DataFrame({"age": age, "sex": sex, "high_income": high_income})
+
+    # 같은 df·RANDOM_STATE로 학습하므로 evaluate_income_model()의 결과와
+    # train_income_model()이 디스크에 저장하는 파이프라인은 동일해야 한다.
+    original_evaluation = modeling.evaluate_income_model(df)
+    train_income_model(df)
+
+    X, _, _, _ = modeling._split_features(df)
+    original_proba = original_evaluation.pipeline.predict_proba(X)[:, 1]
+    reloaded_proba = predict_income(df)["probability"].to_numpy()
+
+    assert np.allclose(original_proba, reloaded_proba)

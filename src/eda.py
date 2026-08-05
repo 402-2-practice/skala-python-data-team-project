@@ -3,6 +3,7 @@
 이 모듈은 데이터 정제를 직접 수행하지 않는다.
 모든 분석은 ``src.data.load_and_clean()``이 반환한 공통 정제 데이터를 사용한다.
 
+<<<<<<< HEAD
 main.py에서 사용 시 : 
 
 eda_result = run_eda(
@@ -14,6 +15,17 @@ eda_result = run_eda(
 eda_result["summary"]
 eda_result["tables"]
 eda_result["output_paths"]
+=======
+main.py에서 사용 시:
+
+    eda_result = run_eda(df=cleaned_df)
+
+반환값:
+
+    eda_result["summary"]        - report.py가 읽는 JSON 요약
+    eda_result["tables"]         - 결측치/중복/기술통계 등 개별 표
+    eda_result["output_paths"]   - 저장된 파일 경로 (save_output=True일 때만)
+>>>>>>> 00f1f9d05288afff020bb71de3d4c6317fd0c9da
 """
 
 from __future__ import annotations
