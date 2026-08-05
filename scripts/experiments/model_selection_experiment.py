@@ -7,6 +7,12 @@ src/modeling.py에 들어가는 모델·하이퍼파라미터는 이론적 추�
 src/data.py가 현재 깨져있어(KNOWN_ISSUES.md) import할 수 없으므로,
 scripts/make_local_test_sample.py와 동일하게 정제 로직을 여기서 직접 재현한다.
 
+전처리는 모델마다 다르다: HistGradientBoosting은 src/modeling.py와 동일하게
+categorical_features="from_dtype" 네이티브 범주형 처리를 쓰고(원-핫 인코딩 없음),
+Logistic Regression·Random Forest는 원-핫 인코딩(+ LR만 StandardScaler)을 그대로 쓴다
+(두 모델 다 카테고리 dtype을 분기 기준으로 못 쓰기 때문). 그래서 세 모델을 같은
+X_train/X_test가 아니라 모델별로 인코딩된 데이터로 각각 학습·평가한다.
+
 실행:
     python scripts/experiments/model_selection_experiment.py
 """
@@ -63,7 +69,10 @@ def load_and_clean() -> pd.DataFrame:
     return cleaned.dropna().reset_index(drop=True)
 
 
-def build_preprocessing(numeric_columns: list[str], categorical_columns: list[str]) -> ColumnTransformer:
+def build_preprocessing_ohe(numeric_columns: list[str], categorical_columns: list[str]) -> ColumnTransformer:
+    """Logistic Regression·Random Forest용 전처리. 둘 다 카테고리 dtype을 직접
+    분기 기준으로 못 쓰므로 원-핫 인코딩이 필요하다 (LR은 추가로 스케일링도 필요).
+    """
     return ColumnTransformer(
         [
             (
@@ -76,7 +85,6 @@ def build_preprocessing(numeric_columns: list[str], categorical_columns: list[st
                 Pipeline(
                     [
                         ("imputer", SimpleImputer(strategy="most_frequent")),
-                        # 이 실험엔 HistGradientBoosting도 있는데 sparse 행렬을 못 받기 때문에 dense로 인코딩한다.
                         ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
                     ]
                 ),
@@ -86,12 +94,38 @@ def build_preprocessing(numeric_columns: list[str], categorical_columns: list[st
     )
 
 
-def candidate_search_spaces(preprocessing: ColumnTransformer) -> dict[str, tuple[Pipeline, dict]]:
+def build_preprocessing_native(numeric_columns: list[str], categorical_columns: list[str]) -> ColumnTransformer:
+    """HistGradientBoosting용 전처리. src/modeling.py와 동일하게 원-핫 인코딩 없이
+    categorical_features="from_dtype"로 category dtype 컬럼을 그대로 분기 기준에 쓴다.
+    결측치도 모델이 자체 처리하므로 범주형 imputer가 필요 없다. ColumnTransformer가
+    category dtype을 그대로 넘기도록 set_output(transform="pandas")를 지정해야 한다.
+    """
+    preprocessing = ColumnTransformer(
+        [
+            (
+                "numeric",
+                Pipeline([("imputer", SimpleImputer(strategy="median"))]),
+                numeric_columns,
+            ),
+            (
+                "categorical",
+                "passthrough",
+                categorical_columns,
+            ),
+        ]
+    )
+    preprocessing.set_output(transform="pandas")
+    return preprocessing
+
+
+def candidate_search_spaces(
+    ohe_preprocessing: ColumnTransformer, native_preprocessing: ColumnTransformer
+) -> dict[str, tuple[Pipeline, dict]]:
     return {
         "logistic_regression": (
             Pipeline(
                 [
-                    ("preprocessing", preprocessing),
+                    ("preprocessing", ohe_preprocessing),
                     (
                         "model",
                         LogisticRegression(
@@ -105,7 +139,7 @@ def candidate_search_spaces(preprocessing: ColumnTransformer) -> dict[str, tuple
         "random_forest": (
             Pipeline(
                 [
-                    ("preprocessing", preprocessing),
+                    ("preprocessing", ohe_preprocessing),
                     (
                         "model",
                         RandomForestClassifier(
@@ -123,11 +157,13 @@ def candidate_search_spaces(preprocessing: ColumnTransformer) -> dict[str, tuple
         "hist_gradient_boosting": (
             Pipeline(
                 [
-                    ("preprocessing", preprocessing),
+                    ("preprocessing", native_preprocessing),
                     (
                         "model",
                         HistGradientBoostingClassifier(
-                            class_weight="balanced", random_state=RANDOM_STATE
+                            categorical_features="from_dtype",
+                            class_weight="balanced",
+                            random_state=RANDOM_STATE,
                         ),
                     ),
                 ]
@@ -155,18 +191,35 @@ def main() -> None:
     for column in categorical_columns:
         X[column] = X[column].astype(object).where(X[column].notna(), np.nan)
 
+    # object dtype 버전(LR·RF의 OneHotEncoder용)과 category dtype 버전
+    # (HGB의 categorical_features="from_dtype"용)을 둘 다 준비한다.
+    X_native = X.copy()
+    for column in categorical_columns:
+        X_native[column] = X_native[column].astype("category")
+
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, stratify=y, random_state=RANDOM_STATE
     )
+    # 동일한 split이 되도록 인덱스만 그대로 가져와 category dtype 버전에 적용한다.
+    X_train_native = X_native.loc[X_train.index]
+    X_test_native = X_native.loc[X_test.index]
 
-    preprocessing = build_preprocessing(numeric_columns, categorical_columns)
-    spaces = candidate_search_spaces(preprocessing)
+    train_data_by_model = {
+        "logistic_regression": (X_train, X_test),
+        "random_forest": (X_train, X_test),
+        "hist_gradient_boosting": (X_train_native, X_test_native),
+    }
+
+    ohe_preprocessing = build_preprocessing_ohe(numeric_columns, categorical_columns)
+    native_preprocessing = build_preprocessing_native(numeric_columns, categorical_columns)
+    spaces = candidate_search_spaces(ohe_preprocessing, native_preprocessing)
     cv = StratifiedKFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_STATE)
 
     results = []
     fitted_searches = {}
 
     for name, (pipeline, param_distributions) in spaces.items():
+        model_X_train, _ = train_data_by_model[name]
         print(f"\n=== {name} 탐색 시작 (n_iter={N_ITER}, cv={CV_FOLDS}) ===")
         search = RandomizedSearchCV(
             pipeline,
@@ -179,7 +232,7 @@ def main() -> None:
             refit=True,
         )
         start = time.perf_counter()
-        search.fit(X_train, y_train)
+        search.fit(model_X_train, y_train)
         search_seconds = time.perf_counter() - start
 
         results.append(
@@ -197,10 +250,11 @@ def main() -> None:
     results_df = pd.DataFrame(results).sort_values("cv_roc_auc_mean", ascending=False)
     winner_name = results_df.iloc[0]["model"]
     winner_search = fitted_searches[winner_name]
+    _, winner_X_test = train_data_by_model[winner_name]
 
     predict_start = time.perf_counter()
-    prediction = winner_search.predict(X_test)
-    probability = winner_search.predict_proba(X_test)[:, 1]
+    prediction = winner_search.predict(winner_X_test)
+    probability = winner_search.predict_proba(winner_X_test)[:, 1]
     predict_seconds = time.perf_counter() - predict_start
 
     final_metrics = {

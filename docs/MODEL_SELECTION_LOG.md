@@ -19,7 +19,38 @@
 | Random Forest | `n_estimators`(100~600), `max_depth`(None/5/10/15/20/30), `min_samples_leaf`(1~10) |
 | HistGradientBoosting | `learning_rate`(log-uniform 1e-2~3e-1), `max_depth`(None/3/5/8/12), `max_iter`(100~400), `l2_regularization`(0~1) |
 
-## 결과 (2026-08-04 실행)
+## 재검증 (2026-08-05, 네이티브 범주형 처리)
+
+src/modeling.py가 HistGradientBoosting 전처리를 OneHotEncoder에서 네이티브 범주형
+처리(`categorical_features="from_dtype"`)로 바꾸면서, 아래 원본 실험(OneHotEncoder
+기준)이 채택한 하이퍼파라미터가 그대로 유효한지 재실행해서 확인했다.
+Logistic Regression·Random Forest는 카테고리 dtype을 분기 기준으로 못 쓰므로
+원-핫 인코딩을 그대로 쓰고, HistGradientBoosting만 네이티브 범주형으로 바꿔 비교했다.
+
+| 모델 | CV ROC-AUC | 탐색 시간 |
+|---|---|---|
+| **HistGradientBoosting (네이티브 범주형)** | **0.9254** | 7.6초 |
+| Random Forest (원-핫) | 0.9134 | 40.3초 |
+| Logistic Regression (원-핫) | 0.9053 | 6.0초 |
+
+채택된 하이퍼파라미터는 원본 실험과 **동일**했다:
+
+```python
+{
+    "learning_rate": 0.14447746112718687,
+    "max_depth": 5,
+    "max_iter": 154,
+    "l2_regularization": 0.45606998421703593,
+}
+```
+
+Held-out 테스트셋: Accuracy 0.8341 / Precision 0.6214 / Recall 0.8541 / F1 0.7194 /
+ROC-AUC 0.9255 (예측 시간 1,000행당 0.005초) — 원본 실험(ROC-AUC 0.9246)과 오차
+범위 내로 동일하거나 소폭 개선. **결론: 네이티브 범주형 처리로 바꿔도 BEST_MODEL_PARAMS를
+다시 튜닝할 필요는 없다.** 탐색 시간도 원-핫 대비 짧아졌다(36.2초 → 7.6초) —
+더미 변수가 없어 피처 수가 줄어든 결과로 보인다.
+
+## 결과 (2026-08-04 실행, OneHotEncoder 기준 — 원본 실험)
 
 | 모델 | CV ROC-AUC | 탐색 시간 |
 |---|---|---|
