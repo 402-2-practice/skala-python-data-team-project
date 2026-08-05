@@ -1,13 +1,3 @@
-"""Adult Income 데이터 로딩, 정제 및 Pandas/Polars 성능 비교."""
-
-"""main.py에서 사용 시 : 
-
-cleaned_df, comparison = run_data_pipeline()
-
-반환 값 : 
-cleaned_df : 정제된 pandas.DataFrame
-comparison : Pandas/Polars 성능 비교 딕셔너리
-"""
 from __future__ import annotations
 
 import json
@@ -28,6 +18,16 @@ from .config import (
     ensure_directories,
 )
 
+"""Adult Income 데이터 로딩, 정제 및 Pandas/Polars 성능 비교."""
+
+"""main.py에서 사용 시 : 
+
+cleaned_df, comparison = run_data_pipeline()
+
+반환 값 : 
+cleaned_df : 정제된 pandas.DataFrame
+comparison : Pandas/Polars 성능 비교 딕셔너리
+"""
 
 Backend = Literal["auto", "pandas", "polars"]
 
