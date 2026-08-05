@@ -5,12 +5,11 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from src.config import MODEL_DIR, TABLE_DIR, ensure_directories
+import src.modeling as modeling
 from src.modeling import train_income_model
 
 
 def test_train_income_model_produces_expected_metrics_and_artifacts():
-    ensure_directories()
     rng = np.random.default_rng(0)
     n = 120
     age = rng.integers(20, 65, size=n)
@@ -25,12 +24,11 @@ def test_train_income_model_produces_expected_metrics_and_artifacts():
         assert key in metrics
         assert 0.0 <= metrics[key] <= 1.0
 
-    assert (MODEL_DIR / "income_pipeline.joblib").exists()
-    assert (TABLE_DIR / "model_metrics.json").exists()
+    assert (modeling.MODEL_DIR / "income_pipeline.joblib").exists()
+    assert (modeling.TABLE_DIR / "model_metrics.json").exists()
 
 
 def test_train_income_model_excludes_leakage_columns():
-    ensure_directories()
     rng = np.random.default_rng(1)
     n = 200
     age = rng.integers(20, 65, size=n)

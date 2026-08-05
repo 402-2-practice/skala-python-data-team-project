@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import json
 
-from src.config import REPORT_PATH, TABLE_DIR, ensure_directories
-from src.report import generate_report
+import src.report as report
 
 _EDA = {
     "dataset": {"rows": 100, "columns": 16},
@@ -51,11 +50,12 @@ _MODEL = {
 
 
 def _write_fixture_json(filename: str, payload: dict) -> None:
-    (TABLE_DIR / filename).write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    (report.TABLE_DIR / filename).write_text(
+        json.dumps(payload, ensure_ascii=False), encoding="utf-8"
+    )
 
 
 def test_generate_report_combines_all_stage_outputs():
-    ensure_directories()
     _write_fixture_json("eda_summary.json", _EDA)
     _write_fixture_json("data_engine_benchmark.json", _BENCHMARK)
     _write_fixture_json("welch_ttest.json", _WELCH)
@@ -63,10 +63,10 @@ def test_generate_report_combines_all_stage_outputs():
     _write_fixture_json("psm_sensitivity_result.json", _SENSITIVITY)
     _write_fixture_json("model_metrics.json", _MODEL)
 
-    generate_report()
+    report.generate_report()
 
-    assert REPORT_PATH.exists()
-    content = REPORT_PATH.read_text(encoding="utf-8")
+    assert report.REPORT_PATH.exists()
+    content = report.REPORT_PATH.read_text(encoding="utf-8")
     assert "대학 학위" in content
     assert "0.81" in content  # accuracy
     assert "40" in content  # matched_pairs
