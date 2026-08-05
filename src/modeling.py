@@ -2,16 +2,12 @@
 
 담당: 원광식 (ML 모델링)
 
-모델과 하이퍼파라미터는 이론적 선택이 아니라
-scripts/experiments/model_selection_experiment.py의 실제 실행 결과로
-채택했다. 근거와 비교 대상(Logistic Regression, Random Forest)은
-docs/MODEL_SELECTION_LOG.md에 기록되어 있다.
+모델·하이퍼파라미터는 scripts/experiments/model_selection_experiment.py의 실제 탐색
+결과로 채택했다 (비교 대상·근거: docs/MODEL_SELECTION_LOG.md).
 
-HistGradientBoosting 전처리는 원-핫 인코딩 대신 네이티브 범주형 처리
-(categorical_features="from_dtype")를 쓴다. BEST_MODEL_PARAMS는 원래 원-핫 인코딩
-기준으로 탐색됐지만, model_selection_experiment.py를 네이티브 범주형 기준으로 재실행해
-같은 하이퍼파라미터가 그대로 유효함을 확인했다 (2026-08-05 재검증,
-docs/MODEL_SELECTION_LOG.md "재검증" 절 참고).
+전처리는 원-핫 인코딩 대신 네이티브 범주형 처리(categorical_features="from_dtype")를
+쓴다. BEST_MODEL_PARAMS는 원-핫 기준으로 탐색됐지만 네이티브 범주형으로 재검증해도
+그대로 유효함을 확인했다 (docs/MODEL_SELECTION_LOG.md "재검증" 절).
 """
 
 from __future__ import annotations
@@ -76,14 +72,13 @@ class ModelEvaluation:
     metrics: dict
     fairness: pd.DataFrame
     feature_importance: pd.DataFrame
+    predictions: pd.DataFrame
     model_card: dict = field(default_factory=dict)
 
 
 def _validate_input(df: pd.DataFrame) -> None:
-    """main.py가 넘겨주는 df가 기대한 데이터 계약을 만족하는지 확인한다.
-
-    src/data.py가 앞으로 바뀌어도 이 함수가 계약 위반을 여기서 바로
-    잡아내야, 문제가 sklearn 내부 에러로 애매하게 터지는 걸 막을 수 있다.
+    """df가 학습에 필요한 데이터 계약(타깃 컬럼, 클래스 수/균형 등)을 만족하는지 확인한다.
+    여기서 잡아야 sklearn 내부 에러로 애매하게 터지는 걸 막는다.
     """
     if df is None or not isinstance(df, pd.DataFrame):
         raise ModelingError("train_income_model()은 pandas.DataFrame을 받아야 합니다.")
@@ -124,12 +119,9 @@ def _validate_input(df: pd.DataFrame) -> None:
 
 
 def _check_excluded_column_casing(columns: pd.Index) -> None:
-    """스키마 변경으로 컬럼명 대소문자가 바뀌어 EXCLUDED_COLUMNS가 못 걸러내는 상황을 막는다.
-
-    예: 업스트림에서 "income"이 "Income"으로 바뀌면 EXCLUDED_COLUMNS(소문자 고정)는
-    이를 제외하지 못하고, 정답 원문이 그대로 피처로 들어가는 유출이 생긴다. 대소문자만
-    다른 채로 남아 있는 컬럼을 발견하면 자동으로 걸러내지 않고 명시적으로 실패시켜서,
-    "몰래 통과"가 아니라 스키마를 고치도록 강제한다.
+    """스키마의 대소문자가 바뀌어 EXCLUDED_COLUMNS가 못 걸러내는 상황(예: income→Income)을
+    막는다. 대소문자만 다른 컬럼이 남아 있으면 조용히 통과시키지 않고 실패시켜, 정답 유출
+    대신 스키마를 고치도록 강제한다.
     """
     excluded_lower = {name.lower() for name in EXCLUDED_COLUMNS}
     for column in columns:
@@ -144,12 +136,9 @@ def _check_excluded_column_casing(columns: pd.Index) -> None:
 
 
 def _coerce_feature_dtypes(X: pd.DataFrame, categorical_columns: list[str]) -> pd.DataFrame:
-    """범주형 컬럼을 pandas category dtype으로 맞춘다.
-
-    HistGradientBoostingClassifier(categorical_features="from_dtype")는 입력 DataFrame에서
-    dtype이 category인 컬럼을 범주형으로 자동 인식한다. pandas의 pd.NA는 sklearn이 못 알아듣고
-    예외를 던지므로, 결측치는 먼저 np.nan으로 바꾼 뒤 category로 변환한다 (category dtype은
-    NaN을 별도 레벨 없이 결측으로 허용하고, HGB는 결측을 자체적으로 분기 처리한다).
+    """범주형 컬럼을 pandas category dtype으로 맞춘다 — HistGradientBoosting이
+    categorical_features="from_dtype"로 이 dtype만 범주형으로 인식한다. pd.NA는
+    sklearn이 못 읽으므로 np.nan으로 바꾼 뒤 변환한다 (결측 분기는 모델이 자체 처리).
     """
     X = X.copy()
     for column in categorical_columns:
@@ -173,19 +162,12 @@ def _split_features(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, list[str
 
 
 def _build_pipeline(numeric_columns: list[str], categorical_columns: list[str]) -> Pipeline:
-    """전처리(수치형 결측치 처리) + 채택 모델(HistGradientBoosting)을 하나의
-    sklearn Pipeline으로 묶는다.
+    """전처리(수치형 결측치 처리) + HistGradientBoosting을 하나의 Pipeline으로 묶는다.
 
-    범주형 컬럼은 OneHotEncoder로 더미 변수화하지 않는다. HistGradientBoosting은
-    categorical_features="from_dtype"로 pandas category dtype 컬럼을 직접 분기 기준으로
-    쓸 수 있어서, 더미 변수 폭발(메모리)과 그로 인한 학습/추론 속도 저하를 피할 수 있다.
-    결측치도 모델이 자체적으로 분기 처리하므로 범주형 imputer도 필요 없다.
-    ColumnTransformer는 set_output(transform="pandas")로 category dtype을 그대로
-    보존해서 넘겨야 모델이 이를 인식한다.
-
-    예전엔 Logistic Regression도 후보였어서 수치형 컬럼에 StandardScaler를 같이 썼는데,
-    지금은 HistGradientBoosting만 남았다. 이 모델은 트리 기반이라 분기 기준이 값의 순서만
-    보고 스케일에는 영향받지 않으므로, 스케일링이 무의미해져 제거했다.
+    범주형은 OneHotEncoder 대신 category dtype 그대로 넘긴다(categorical_features=
+    "from_dtype") — 더미 변수 폭발을 피하고, 결측도 모델이 자체 처리해 별도 imputer가
+    필요 없다. set_output(transform="pandas")는 이 dtype을 ColumnTransformer 통과 후에도
+    보존하기 위함이다. 트리 기반이라 스케일에 영향받지 않으므로 스케일링은 뺐다.
     """
     preprocessing = ColumnTransformer(
         [
@@ -214,11 +196,9 @@ def _build_pipeline(numeric_columns: list[str], categorical_columns: list[str]) 
 def _fairness_by_group(
     df_test: pd.DataFrame, y_test: pd.Series, prediction: np.ndarray, group_columns: list[str]
 ) -> pd.DataFrame:
-    """민감 변수 집단별 Recall/False Negative Rate을 비교한다.
-
-    모델이 특정 집단에서 실제 고소득자를 유독 많이 놓치는지 확인하기 위한 진단용 지표다.
-    `reliable`이 False인 행은 실제 양성 표본이 너무 적어(<MIN_RELIABLE_GROUP_POSITIVES)
-    recall 추정이 불안정하다는 뜻이므로 참고용으로만 봐야 한다.
+    """민감 변수(성별·인종) 집단별 Recall/False Negative Rate 진단표를 만든다.
+    `reliable=False`는 양성 표본이 적어(<MIN_RELIABLE_GROUP_POSITIVES) recall 추정이
+    불안정하다는 뜻 — 참고용으로만 본다.
     """
     rows = []
     for column in group_columns:
@@ -246,11 +226,9 @@ def _fairness_by_group(
 
 
 def _assess_fairness(fairness: pd.DataFrame) -> dict:
-    """집단별 recall 격차/최저치가 기준을 넘는지 판정하고, 위반 시 경고 로그를 남긴다.
-
-    표본이 부족해 신뢰할 수 없는(reliable=False) 집단은 판정에서 제외한다 — 그런 집단은
-    recall 자체가 추정 오차가 커서, 기준 미달로 잡히더라도 모델 결함인지 표본 부족인지
-    구분할 수 없기 때문이다.
+    """집단별 recall 최저치/격차가 기준을 넘는지 판정하고, 위반 시 경고 로그를 남긴다.
+    reliable=False 집단은 추정 오차가 커 모델 결함인지 표본 부족인지 구분 못 하므로
+    판정에서 제외한다.
     """
     if fairness.empty:
         return {"status": "skipped", "reason": "그룹별 표본 없음"}
@@ -278,8 +256,7 @@ def _assess_fairness(fairness: pd.DataFrame) -> dict:
                 }
             )
         if recall_gap > FAIRNESS_MAX_RECALL_GAP:
-            # 격차 수치만 남기면 model_card만 보고는 어느 집단을 고쳐야 할지 알 수 없으므로,
-            # 격차의 양 끝(recall이 가장 낮은/높은 집단)을 함께 남긴다.
+            # 어느 집단을 고쳐야 할지 알 수 있게 최저/최고 집단을 함께 남긴다.
             violations.append(
                 {
                     "group_column": column,
@@ -330,11 +307,8 @@ def _feature_importance(
 ) -> pd.DataFrame:
     """테스트셋 기준 permutation importance를 계산한다.
 
-    HistGradientBoosting은 RandomForest와 달리 `.feature_importances_`를
-    제공하지 않아서 permutation importance로 대체한다. 원본 컬럼(예: education,
-    college_degree) 단위로 나오기 때문에 원-핫 인코딩된 더미 변수 단위로
-    쪼개지는 것보다 해석하기 쉽다 — "학력이 소득 예측에 얼마나 기여하는가"라는
-    이 프로젝트의 핵심 질문과 바로 연결된다.
+    HistGradientBoosting은 `.feature_importances_`가 없어 대신 쓴다. 원본 컬럼 단위로
+    나와서(더미 변수로 안 쪼개짐) "학력이 소득 예측에 얼마나 기여하는가"를 바로 보여준다.
     """
     result = permutation_importance(
         pipeline,
@@ -362,11 +336,9 @@ def _build_model_card(
     feature_columns: list[str],
     fairness_assessment: dict,
 ) -> dict:
-    """재현성을 위한 메타데이터. 같은 코드를 나중에 다시 돌렸을 때
-    "그때 그 결과"가 어떤 환경·데이터 규모에서 나온 건지 추적하기 위함이다.
-
-    fairness_assessment는 단순 진단표(model_fairness_by_group.csv)와 달리, 판정 결과
-    (pass/fail)와 위반 내역을 담아 CI나 배포 게이트가 사람이 읽지 않고도 확인할 수 있게 한다.
+    """재현용 메타데이터 — 나중에 같은 코드를 다시 돌렸을 때 "그때 결과"가 어떤 환경·
+    데이터 규모에서 나왔는지 추적한다. fairness_assessment는 진단표와 달리 pass/fail
+    판정까지 담아 CI/배포 게이트가 사람 없이도 확인할 수 있게 한다.
     """
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -385,10 +357,8 @@ def _build_model_card(
 
 
 def evaluate_income_model(df: pd.DataFrame) -> ModelEvaluation:
-    """학습·평가만 수행하고 디스크에는 아무것도 쓰지 않는다 (테스트용 진입점).
-
-    train_income_model()이 이 함수를 감싸서 저장까지 하는 구조라, tests/에서는
-    파일 시스템 없이 이 함수만 호출해서 결과를 검증할 수 있다.
+    """학습·평가만 하고 디스크엔 쓰지 않는다 (테스트용 진입점) — train_income_model()이
+    이걸 감싸 저장까지 하므로, tests/는 파일 I/O 없이 이 함수만 호출해 검증할 수 있다.
     """
     # 1. 데이터 계약 검증 (타깃 컬럼, 클래스 수/균형, 제외 컬럼 대소문자 등)
     _validate_input(df)
@@ -396,14 +366,12 @@ def evaluate_income_model(df: pd.DataFrame) -> ModelEvaluation:
     # 2. 피처(X)/타깃(y) 분리 + 수치형/범주형 컬럼 구분
     X, y, numeric_columns, categorical_columns = _split_features(df)
 
-    # 3. 학습 80% / 테스트(held-out) 20% 분리 — 테스트셋은 최종 평가에만 쓰고
-    #    이후 어떤 학습·튜닝 과정에도 노출시키지 않는다.
+    # 3. 학습 80% / 테스트(held-out) 20% 분리 — 테스트셋은 최종 평가에만 쓴다.
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, stratify=y, random_state=RANDOM_STATE
     )
 
-    # 4. 전처리+모델 파이프라인 구성 후 학습 데이터로 학습
-    #    (수치형 median imputer는 이 시점에 X_train에만 fit되므로 테스트셋 유출 없음)
+    # 4. 파이프라인 구성 후 X_train만으로 학습 (imputer도 X_train에만 fit — 유출 없음)
     pipeline = _build_pipeline(numeric_columns, categorical_columns)
     try:
         pipeline.fit(X_train, y_train)
@@ -424,12 +392,22 @@ def evaluate_income_model(df: pd.DataFrame) -> ModelEvaluation:
         "roc_auc": float(roc_auc_score(y_test, probability)),
     }
 
+    # 5-1. 컨퓨전매트릭스/ROC 커브는 집계 지표만으론 못 그리므로, 시각화 파트가 바로
+    #      읽을 수 있게 테스트셋 행 단위 예측값을 남긴다. row_id는 X_test 원본 인덱스.
+    predictions = pd.DataFrame(
+        {
+            "row_id": X_test.index,
+            "y_test": y_test.to_numpy(),
+            "y_pred": prediction,
+            "y_proba": probability,
+        }
+    )
+
     # 6. 민감 변수(성별·인종)별 Recall/False Negative Rate 진단 + 기준 위반 판정
     fairness = _fairness_by_group(X_test, y_test, prediction, FAIRNESS_GROUP_COLUMNS)
     fairness_assessment = _assess_fairness(fairness)
 
-    # 7. 피처 중요도 (permutation importance) — 학력 관련 변수가 실제로
-    #    예측에 얼마나 기여하는지, 팀의 인과추론 분석과 대조해볼 근거 자료
+    # 7. 피처 중요도(permutation importance) — 팀의 인과추론 분석과 대조할 근거 자료
     feature_importance = _feature_importance(pipeline, X_test, y_test)
 
     model_card = _build_model_card(
@@ -441,6 +419,7 @@ def evaluate_income_model(df: pd.DataFrame) -> ModelEvaluation:
         metrics=metrics,
         fairness=fairness,
         feature_importance=feature_importance,
+        predictions=predictions,
         model_card=model_card,
     )
 
@@ -448,8 +427,8 @@ def evaluate_income_model(df: pd.DataFrame) -> ModelEvaluation:
 def _save_outputs(evaluation: ModelEvaluation) -> None:
     """학습된 파이프라인(joblib)과 평가 지표·진단 결과(json/csv)를 디스크에 남긴다.
 
-    model_metrics.json은 src/report.py가 report.md를 만들 때 그대로 읽으므로
-    파일명·경로·키 이름을 바꾸면 안 된다.
+    model_metrics.json, model_predictions.csv 모두 다른 파트가 파일명·컬럼명을
+    그대로 참조하므로 이름을 바꾸면 안 된다.
     """
     try:
         MODEL_DIR.mkdir(parents=True, exist_ok=True)
@@ -466,6 +445,7 @@ def _save_outputs(evaluation: ModelEvaluation) -> None:
         evaluation.feature_importance.to_csv(
             TABLE_DIR / "model_feature_importance.csv", index=False
         )
+        evaluation.predictions.to_csv(TABLE_DIR / "model_predictions.csv", index=False)
     except (OSError, TypeError) as exc:
         raise ModelingError(f"모델/지표 저장에 실패했습니다: {exc}") from exc
 
@@ -492,12 +472,11 @@ def train_income_model(df: pd.DataFrame) -> dict:
 
 
 def predict_income(df: pd.DataFrame) -> pd.DataFrame:
-    """저장된 income_pipeline.joblib으로 새 데이터에 대한 예측값/확률을 반환한다.
+    """저장된 income_pipeline.joblib으로 새 데이터의 예측값/확률을 반환한다.
 
-    train_income_model()과 별도 프로세스(배포 서버, 배치 작업 등)에서 호출되는
-    표준 추론 진입점이다. 학습 때와 동일하게 EXCLUDED_COLUMNS를 제외한 나머지
-    컬럼을 피처로 쓰고, 범주형 컬럼은 같은 방식(category dtype)으로 맞춘다.
-    입력 df에 타깃(high_income)이나 income 컬럼이 있어도 없어도 동작한다.
+    train_income_model()과 별도 프로세스(배포·배치)에서 쓰는 추론 진입점. 학습 때와
+    같은 방식(EXCLUDED_COLUMNS 제외, category dtype)으로 피처를 맞추므로, 입력에
+    타깃 컬럼이 있어도 없어도 동작한다.
     """
     if df is None or not isinstance(df, pd.DataFrame):
         raise ModelingError("predict_income()은 pandas.DataFrame을 받아야 합니다.")
