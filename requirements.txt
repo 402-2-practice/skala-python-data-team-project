@@ -7,4 +7,5 @@ matplotlib>=3.7
 seaborn>=0.13
 plotly>=5.18
 joblib>=1.3
+pytest>=8.0
 
