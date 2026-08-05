@@ -14,6 +14,7 @@ def _read_json(filename: str) -> dict:
 
 def generate_report() -> None:
     eda = _read_json("eda_summary.json")
+    benchmark = _read_json("data_engine_benchmark.json")
     test = _read_json("welch_ttest.json")
     psm = _read_json("psm_result.json")
     sensitivity = _read_json("psm_sensitivity_result.json")
@@ -30,11 +31,11 @@ def generate_report() -> None:
 
 ## 데이터
 
-- 정제 후 표본: {eda['rows']:,}명
-- 대학 학위 보유 비율: {eda['college_degree_pct']:.2f}%
-- 전체 고소득 비율: {eda['high_income_pct']:.2f}%
-- Pandas 로딩 시간: {eda['pandas_seconds']:.6f}초
-- Polars 로딩 시간: {eda['polars_seconds']:.6f}초
+- 정제 후 표본: {eda['dataset']['rows']:,}명
+- 대학 학위 보유 비율: {eda['college_degree_distribution']['college_degree_rate'] * 100:.2f}%
+- 전체 고소득 비율: {eda['target_distribution']['high_income_rate'] * 100:.2f}%
+- Pandas 로딩 시간: {benchmark['pandas_median_seconds']:.6f}초
+- Polars 로딩 시간: {benchmark['polars_median_seconds']:.6f}초
 
 ## 매칭 전 비교
 
