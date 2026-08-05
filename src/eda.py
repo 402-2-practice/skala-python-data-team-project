@@ -1,21 +1,3 @@
-"""Adult Census 정제 데이터에 대한 탐색적 데이터 분석(EDA).
-
-이 모듈은 데이터 정제를 직접 수행하지 않는다.
-모든 분석은 ``src.data.load_and_clean()``이 반환한 공통 정제 데이터를 사용한다.
-"""
-
-"""main.py에서 사용 시 : 
-
-eda_result = run_eda(
-    df=cleaned_df
-)
-
-반환 값 : 
-
-eda_result["summary"]
-eda_result["tables"]
-eda_result["output_paths"]
-"""
 from __future__ import annotations
 
 import json
@@ -36,6 +18,24 @@ from .config import (
 )
 from .data import load_and_clean
 
+"""Adult Census 정제 데이터에 대한 탐색적 데이터 분석(EDA).
+
+이 모듈은 데이터 정제를 직접 수행하지 않는다.
+모든 분석은 ``src.data.load_and_clean()``이 반환한 공통 정제 데이터를 사용한다.
+"""
+
+"""main.py에서 사용 시 : 
+
+eda_result = run_eda(
+    df=cleaned_df
+)
+
+반환 값 : 
+
+eda_result["summary"]
+eda_result["tables"]
+eda_result["output_paths"]
+"""
 
 Backend = Literal["auto", "pandas", "polars"]
 
