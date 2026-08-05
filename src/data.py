@@ -1,3 +1,14 @@
+"""Adult Income 데이터 로딩, 정제 및 Pandas/Polars 성능 비교.
+
+다른 모듈은 이 파일의 세부 함수를 직접 조합하지 않고, 아래 두 공통 인터페이스만 쓴다.
+
+- ``load_and_clean(path, backend, save_output) -> pd.DataFrame``
+  정제된 데이터만 필요할 때 (main.py 등 대부분의 소비자가 이걸 쓴다).
+- ``run_data_pipeline(path, backend, save_output) -> (cleaned_df, comparison)``
+  Pandas/Polars 벤치마크 비교 결과(comparison)까지 함께 필요할 때.
+  ``comparison``에는 두 엔진의 실행 시간과 정제 통계가 담긴다.
+"""
+
 from __future__ import annotations
 
 import json
@@ -17,17 +28,6 @@ from .config import (
     TABLE_DIR,
     ensure_directories,
 )
-
-"""Adult Income 데이터 로딩, 정제 및 Pandas/Polars 성능 비교."""
-
-"""main.py에서 사용 시 : 
-
-cleaned_df, comparison = run_data_pipeline()
-
-반환 값 : 
-cleaned_df : 정제된 pandas.DataFrame
-comparison : Pandas/Polars 성능 비교 딕셔너리
-"""
 
 Backend = Literal["auto", "pandas", "polars"]
 
