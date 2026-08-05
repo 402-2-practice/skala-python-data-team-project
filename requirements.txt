@@ -2,7 +2,7 @@ pandas>=2.0
 polars>=1.0
 numpy>=1.24
 scipy>=1.10
-scikit-learn>=1.3
+scikit-learn>=1.4  # HistGradientBoosting categorical_features="from_dtype"에 필요 (src/modeling.py)
 matplotlib>=3.7
 seaborn>=0.13
 plotly>=5.18
