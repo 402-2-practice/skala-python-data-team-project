@@ -18,11 +18,23 @@ from matplotlib.patches import Rectangle
 from src.config import FIGURE_DIR, TABLE_DIR
 
 
+def _require_columns(df: pd.DataFrame, columns: list[str], chart_name: str) -> None:
+    """차트가 필요로 하는 컬럼이 df에 다 있는지 확인한다.
+
+    없으면 pandas가 던지는 원시 KeyError 대신, 어떤 차트가 어떤 컬럼을 원했는지
+    바로 알 수 있는 메시지로 실패시킨다.
+    """
+    missing = [column for column in columns if column not in df.columns]
+    if missing:
+        raise ValueError(f"{chart_name}에 필요한 컬럼이 없습니다: {missing}")
+
+
 # ============================================================
 # [그룹 비교] 대학 학위별 고소득률 막대그래프 (Seaborn)
 # - x축: college_degree(학위 유무), y축: high_income_rate(%)
 # ============================================================
 def plot_degree_income_rate(df: pd.DataFrame) -> None:
+    _require_columns(df, ["college_degree", "high_income"], "plot_degree_income_rate")
     degree_rate = (
         df.groupby("college_degree", observed=True)["high_income"]
         .mean()
@@ -56,6 +68,9 @@ def plot_degree_income_rate(df: pd.DataFrame) -> None:
 # - hover: 표본 크기(size), education-num
 # ============================================================
 def plot_education_income_rate(df: pd.DataFrame) -> None:
+    _require_columns(
+        df, ["education", "education-num", "high_income"], "plot_education_income_rate"
+    )
     education_rate = (
         df.groupby(["education", "education-num"], observed=True)["high_income"]
         .agg(["mean", "size"])
@@ -81,6 +96,7 @@ def plot_education_income_rate(df: pd.DataFrame) -> None:
 # - 저소득층은 20대 초중반에 몰려있고, 고소득층은 30~50대에 넓게 분포하는지 확인
 # ============================================================
 def plot_age_distribution(df: pd.DataFrame) -> None:
+    _require_columns(df, ["age", "income"], "plot_age_distribution")
     plt.figure(figsize=(8, 5))
     # binwidth를 지정하지 않으면 Seaborn이 자동으로 고른 bin 경계가 정수 나이와
     # 어긋나서 특정 나이만 유독 튀어 보이는 톱니 패턴이 생긴다. age는 정수이므로
@@ -112,6 +128,7 @@ def plot_age_distribution(df: pd.DataFrame) -> None:
 # - 결과변수(high_income)와 직접 연결되는 비교라 설계 문서의 핵심 결과변수와 일치
 # ============================================================
 def plot_capital_gain_indicator(df: pd.DataFrame) -> None:
+    _require_columns(df, ["capital-gain", "high_income"], "plot_capital_gain_indicator")
     capital_gain_indicator = (
         df.assign(has_capital_gain=(df["capital-gain"] > 0).map({False: "No gain", True: "Has gain"}))
         .groupby("has_capital_gain", observed=True)["high_income"]
@@ -153,6 +170,7 @@ def plot_capital_gain_indicator(df: pd.DataFrame) -> None:
 # - 집단 간 소득 격차 존재 여부 확인
 # ============================================================
 def plot_race_sex_income_rate(df: pd.DataFrame) -> None:
+    _require_columns(df, ["race", "sex", "high_income"], "plot_race_sex_income_rate")
     sex_race_rate = (
         df.groupby(["race", "sex"], observed=True)["high_income"]
         .mean()

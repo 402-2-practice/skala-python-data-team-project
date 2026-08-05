@@ -25,6 +25,20 @@ from src.config import FIGURE_DIR, TABLE_DIR
 INCOME_CLASS_LABELS = ["<=50K", ">50K"]
 
 
+def _require_keys(data: dict, keys: list[str], chart_name: str) -> None:
+    """model_metrics.json에 차트가 필요로 하는 키가 다 있는지 확인한다."""
+    missing = [key for key in keys if key not in data]
+    if missing:
+        raise ValueError(f"{chart_name}에 필요한 model_metrics.json 키가 없습니다: {missing}")
+
+
+def _require_columns(df: pd.DataFrame, columns: list[str], chart_name: str) -> None:
+    """model_predictions.csv에 차트가 필요로 하는 컬럼이 다 있는지 확인한다."""
+    missing = [column for column in columns if column not in df.columns]
+    if missing:
+        raise ValueError(f"{chart_name}에 필요한 model_predictions.csv 컬럼이 없습니다: {missing}")
+
+
 # ============================================================
 # [그룹 비교] 예측 모델 성능 지표 막대그래프 (Seaborn)
 # - modeling.py의 train_income_model()이 저장한 model_metrics.json 사용
@@ -40,6 +54,7 @@ def plot_model_metrics() -> None:
 
     model_metrics = json.loads(model_metrics_path.read_text(encoding="utf-8"))
     metric_names = ["accuracy", "precision", "recall", "f1"]
+    _require_keys(model_metrics, metric_names, "plot_model_metrics")
     metrics_table = pd.DataFrame(
         {"metric": metric_names, "score": [model_metrics[name] for name in metric_names]}
     )
@@ -77,7 +92,9 @@ def plot_roc_curve() -> None:
         return
 
     model_metrics = json.loads(model_metrics_path.read_text(encoding="utf-8"))
+    _require_keys(model_metrics, ["roc_auc"], "plot_roc_curve")
     predictions = pd.read_csv(predictions_path)
+    _require_columns(predictions, ["y_test", "y_proba"], "plot_roc_curve")
     fpr, tpr, _ = sk_roc_curve(predictions["y_test"], predictions["y_proba"])
     roc_points = pd.DataFrame({"fpr": fpr, "tpr": tpr})
 
@@ -110,6 +127,7 @@ def plot_confusion_matrix() -> None:
         return
 
     predictions = pd.read_csv(predictions_path)
+    _require_columns(predictions, ["y_test", "y_pred"], "plot_confusion_matrix")
     confusion = sk_confusion_matrix(
         predictions["y_test"],
         predictions["y_pred"],
