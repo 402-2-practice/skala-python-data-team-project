@@ -9,9 +9,12 @@ data/processed/*.csv
 outputs/figures/*
 outputs/tables/*
 outputs/models/*
+report.md
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !outputs/figures/.gitkeep
 !outputs/tables/.gitkeep
 !outputs/models/.gitkeep
+
+.pytest_cache/
 

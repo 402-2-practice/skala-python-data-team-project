@@ -41,7 +41,7 @@ RAW_DATA_PATH = (
 )
 
 PROCESSED_DATA_PATH = (
-    PROCESSED_DIR / "adult_clean.csv"
+    PROCESSED_DIR / "adult_cleaned.csv"
 )
 
 REPORT_PATH = (
@@ -104,12 +104,15 @@ RANDOM_STATE = 42
 # 분석 기준
 # ============================================================
 
-COLLEGE_DEGREES = [
-    "Bachelors",
-    "Masters",
-    "Prof-school",
-    "Doctorate"
-]
+#포함 여부만 검사
+COLLEGE_DEGREES = frozenset(
+    {
+        "Bachelors",
+        "Masters",
+        "Prof-school",
+        "Doctorate",
+    }
+)
 
 
 # ============================================================
