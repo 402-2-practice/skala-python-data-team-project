@@ -38,6 +38,16 @@ python main.py --stage report
 python main.py --data /path/to/adult.csv
 ```
 
+## 테스트
+
+```bash
+pytest
+```
+
+각 담당 모듈이 약속한 산출물 계약(반환값, 생성 파일)을 합성 데이터로 검증한다. `tests/conftest.py`가
+매 테스트마다 출력 경로를 임시 디렉터리로 격리하므로, 테스트를 실행해도 `outputs/`나 `report.md`의
+실제 실행 결과는 덮어써지지 않는다.
+
 ## 파이프라인
 
 ```text
@@ -48,8 +58,9 @@ adult.csv
 adult_cleaned.csv + high_income + college_degree
    ├── EDA ─────────────→ 요약표
    ├── 통계·PSM ────────→ t-test, 매칭 표본, 효과 차이
-   ├── 시각화 ──────────→ Seaborn PNG, Plotly HTML
+   ├── 시각화 ──────────→ Seaborn PNG, Plotly HTML (학위·소득·PSM 주제)
    └── ML Pipeline ─────→ 평가 지표, joblib 모델
+        └── 모델 진단 시각화 → ROC curve, confusion matrix, 성능 지표 막대그래프
                             ↓
                          report.md
 ```
@@ -58,25 +69,33 @@ adult_cleaned.csv + high_income + college_degree
 
 ```text
 .
+├── .github/
+│   └── workflows/ci.yml       # 문법 검사 + pytest 실행
 ├── data/
-│   ├── raw/                  # 수정하지 않는 원본
-│   └── processed/            # 공통 정제 데이터
+│   ├── raw/                   # 수정하지 않는 원본
+│   └── processed/              # 공통 정제 데이터
 ├── docs/
-│   ├── ANALYSIS_DESIGN.md    # 변수 정의와 해석 원칙
-│   └── TEAM_WORKFLOW.md      # 역할, 브랜치, PR 규칙
+│   ├── ANALYSIS_DESIGN.md              # 변수 정의와 해석 원칙
+│   ├── TEAM_WORKFLOW.md                # 역할, 브랜치, PR 규칙
+│   ├── MODEL_SELECTION_LOG.md          # 모델 채택 실험 기록
+│   ├── ML_MODELING_SUMMARY.md          # ML 모델링 결과 요약
+│   └── STATISTICAL_ANALYSIS_SUMMARY.md # 통계·PSM 분석 요약
 ├── outputs/
-│   ├── figures/              # PNG, HTML
-│   ├── tables/               # CSV, JSON
-│   └── models/               # joblib
+│   ├── figures/                # PNG, HTML
+│   ├── tables/                 # CSV, JSON
+│   └── models/                 # joblib
 ├── src/
-│   ├── config.py             # 공통 경로와 상수
-│   ├── data.py               # 로딩·정제·파생변수
-│   ├── eda.py                # EDA
-│   ├── statistics.py         # t-test·PSM
-│   ├── visualization.py      # Seaborn·Plotly
-│   ├── modeling.py           # sklearn Pipeline
-│   └── report.py             # report.md 자동 생성
-├── main.py                   # 전체 실행 진입점
+│   ├── config.py                # 공통 경로와 상수
+│   ├── data.py                  # 로딩·정제·파생변수
+│   ├── eda.py                   # EDA
+│   ├── statistics.py            # t-test·PSM
+│   ├── visualization.py         # 주제 중심 시각화 (Seaborn·Plotly)
+│   ├── modeling.py              # sklearn Pipeline
+│   ├── model_visualization.py   # 모델 진단 시각화 (ROC·confusion matrix)
+│   └── report.py                # report.md 자동 생성
+├── tests/                      # pytest 단위테스트
+├── main.py                     # 전체 실행 진입점
+├── pyproject.toml              # pytest 설정
 ├── requirements.txt
 └── README.md
 ```
