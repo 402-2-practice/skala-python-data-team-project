@@ -1,3 +1,14 @@
+"""Adult Income 데이터 로딩, 정제 및 Pandas/Polars 성능 비교.
+
+main.py에서 사용 시 : 
+
+cleaned_df, comparison = run_data_pipeline()
+
+반환 값 : 
+cleaned_df : 정제된 pandas.DataFrame
+comparison : Pandas/Polars 성능 비교 딕셔너리
+"""
+
 from __future__ import annotations
 
 import json
@@ -9,31 +20,17 @@ from typing import Literal
 import pandas as pd
 import polars as pl
 
-from .config import (
+from src.config import (
     ADULT_COLUMNS,
+    BENCHMARK_RESULT_PATH,
     COLLEGE_DEGREES,
+    CSV_HAS_HEADER,
     PROCESSED_DATA_PATH,
     RAW_DATA_PATH,
-    TABLE_DIR,
     ensure_directories,
 )
 
-"""Adult Income 데이터 로딩, 정제 및 Pandas/Polars 성능 비교."""
-
-"""main.py에서 사용 시 : 
-
-cleaned_df, comparison = run_data_pipeline()
-
-반환 값 : 
-cleaned_df : 정제된 pandas.DataFrame
-comparison : Pandas/Polars 성능 비교 딕셔너리
-"""
-
 Backend = Literal["auto", "pandas", "polars"]
-
-BENCHMARK_RESULT_PATH = (
-    TABLE_DIR / "data_engine_benchmark.json"
-)
 
 VALID_INCOME_LABELS = {
     "<=50K",
@@ -57,32 +54,6 @@ def _validate_data_path(path: Path) -> None:
         raise ValueError(
             f"데이터 경로가 파일이 아닙니다: {path}"
         )
-
-
-def _has_header(path: Path) -> bool:
-    """CSV 첫 행이 열 이름인지 확인한다."""
-
-    with path.open(
-        "r",
-        encoding="utf-8-sig",
-        errors="replace",
-    ) as file:
-        first_line = file.readline()
-
-    if not first_line:
-        raise ValueError(
-            f"데이터 파일이 비어 있습니다: {path}"
-        )
-
-    first_value = (
-        first_line
-        .split(",", maxsplit=1)[0]
-        .strip()
-        .lower()
-    )
-
-    return first_value == "age"
-
 
 def _validate_columns(
     columns: list[str],
@@ -133,14 +104,12 @@ def load_pandas(
     path = Path(path)
     _validate_data_path(path)
 
-    has_header = _has_header(path)
-
     read_options: dict[str, object] = {
         "na_values": ["?", " ?"],
         "skipinitialspace": True,
     }
 
-    if has_header:
+    if CSV_HAS_HEADER:
         df = pd.read_csv(
             path,
             **read_options,
@@ -173,15 +142,13 @@ def load_polars(
     path = Path(path)
     _validate_data_path(path)
 
-    has_header = _has_header(path)
-
     read_options: dict[str, object] = {
-        "has_header": has_header,
+        "has_header": CSV_HAS_HEADER,
         "null_values": ["?", " ?"],
         "infer_schema_length": 10_000,
     }
 
-    if not has_header:
+    if not CSV_HAS_HEADER:
         read_options["new_columns"] = ADULT_COLUMNS
 
     df = pl.read_csv(
@@ -202,6 +169,10 @@ def load_polars(
 
     return df
 
+# 분석 단계의 공통 표본을 유지하기 위해 하나 이상의 결측값이 있는 행을 제거한다.
+# 이 방식은 완전 사례 분석이므로 제거 전 컬럼별 결측 현황을 별도로 기록한다.
+
+# 입력 오류를 제거하기 위한 허용 범위이며, 실제 Adult 데이터의 일반적 값 범위와는 구분한다.
 
 # ============================================================
 # Pandas 정제
@@ -561,7 +532,7 @@ def _run_polars_pipeline(
         cleaning_info,
     )
 
-
+# 데이터 로딩과 전체 정제 시간을 함께 측정하며, 작은 데이터에서는 실행 환경에 따라 결과가 달라질 수 있다.
 def benchmark_cleaners(
     path: str | Path = RAW_DATA_PATH,
     repeats: int = 3,
@@ -700,49 +671,188 @@ def save_benchmark_result(
             indent=2,
         )
 
+# ============================================================
+# 벤치마크 확인을 위한 로드
+# ============================================================
+
+def load_benchmark_result() -> dict[str, object] | None:
+    """
+    기존 Pandas/Polars 성능 비교 결과를 불러온다.
+
+    파일이 없거나 형식이 잘못된 경우 None을 반환해
+    벤치마크를 새로 실행하도록 한다.
+    """
+
+    if not BENCHMARK_RESULT_PATH.exists():
+        return None
+
+    try:
+        with BENCHMARK_RESULT_PATH.open(
+            "r",
+            encoding="utf-8",
+        ) as file:
+            comparison = json.load(file)
+
+    except (
+        OSError,
+        json.JSONDecodeError,
+    ):
+        return None
+
+    selected_engine = comparison.get(
+        "selected_engine"
+    )
+
+    if selected_engine not in {
+        "pandas",
+        "polars",
+    }:
+        return None
+
+    return comparison
+
+# ============================================================
+# 선택된 엔진(pandas, polars) 확인
+# ============================================================
+
+def _run_selected_engine(
+    path: Path,
+    selected_engine: str,
+) -> tuple[pd.DataFrame, float, dict[str, int]]:
+    """저장된 벤치마크 결과에 따라 선택된 엔진 하나만 실행한다."""
+
+    if selected_engine == "pandas":
+        return _run_pandas_pipeline(path)
+
+    if selected_engine == "polars":
+        (
+            polars_df,
+            elapsed,
+            cleaning_info,
+        ) = _run_polars_pipeline(path)
+
+        return (
+            _polars_to_pandas(polars_df),
+            elapsed,
+            cleaning_info,
+        )
+
+    raise ValueError(
+        "selected_engine은 'pandas' 또는 "
+        "'polars'여야 합니다."
+    )
 
 # ============================================================
 # 전체 데이터 파이프라인
 # ============================================================
 
+# main.py가 데이터 정제 결과와 엔진 비교 정보를 모두 필요로 할 때 사용하는 전체 실행 함수다.
 def run_data_pipeline(
     path: str | Path = RAW_DATA_PATH,
     backend: Backend = "auto",
     benchmark_repeats: int = 3,
     save_output: bool = True,
+    reuse_benchmark: bool = True,
 ) -> tuple[pd.DataFrame, dict[str, object]]:
     """
     데이터를 정제하고 Pandas DataFrame으로 반환한다.
 
     backend:
         auto:
-            Pandas와 Polars를 모두 실행하고 더 빠른 엔진 선택
+            최초 실행에서는 Pandas와 Polars를 비교한다.
+            이후 실행에서는 저장된 비교 결과의 엔진만 사용한다.
 
         pandas:
-            Pandas만 실행
+            Pandas만 실행한다.
 
         polars:
-            Polars만 실행
+            Polars만 실행한다.
+
+    reuse_benchmark:
+        True이면 기존 성능 비교 결과를 재사용한다.
+        False이면 Pandas와 Polars를 다시 비교한다.
     """
 
     path = Path(path)
+    _validate_data_path(path)
+
+    benchmark_was_created = False
 
     if backend == "auto":
-        (
-            pandas_df,
-            polars_df,
-            comparison,
-        ) = benchmark_cleaners(
-            path=path,
-            repeats=benchmark_repeats,
-        )
+        cached_comparison = None
 
-        if comparison["selected_engine"] == "pandas":
-            cleaned_df = pandas_df
-        else:
-            cleaned_df = _polars_to_pandas(
-                polars_df
+        # 기본 데이터 파일에 대해서만 기존 벤치마크를 재사용한다.
+        if (
+            reuse_benchmark
+            and path.resolve()
+            == RAW_DATA_PATH.resolve()
+        ):
+            cached_comparison = (
+                load_benchmark_result()
             )
+
+        if cached_comparison is None:
+            (
+                pandas_df,
+                polars_df,
+                comparison,
+            ) = benchmark_cleaners(
+                path=path,
+                repeats=benchmark_repeats,
+            )
+
+            benchmark_was_created = True
+
+            if (
+                comparison["selected_engine"]
+                == "pandas"
+            ):
+                cleaned_df = pandas_df
+            else:
+                cleaned_df = (
+                    _polars_to_pandas(
+                        polars_df
+                    )
+                )
+
+            comparison[
+                "benchmark_reused"
+            ] = False
+
+        else:
+            selected_engine = str(
+                cached_comparison[
+                    "selected_engine"
+                ]
+            )
+
+            (
+                cleaned_df,
+                elapsed,
+                cleaning_info,
+            ) = _run_selected_engine(
+                path,
+                selected_engine,
+            )
+
+            comparison = dict(
+                cached_comparison
+            )
+
+            comparison[
+                "benchmark_reused"
+            ] = True
+
+            comparison[
+                "latest_run_seconds"
+            ] = round(
+                elapsed,
+                6,
+            )
+
+            comparison[
+                "latest_cleaning_info"
+            ] = cleaning_info
 
     elif backend == "pandas":
         (
@@ -753,6 +863,7 @@ def run_data_pipeline(
 
         comparison = {
             "selected_engine": "pandas",
+            "benchmark_reused": False,
             "pandas_median_seconds": round(
                 elapsed,
                 6,
@@ -773,6 +884,7 @@ def run_data_pipeline(
 
         comparison = {
             "selected_engine": "polars",
+            "benchmark_reused": False,
             "polars_median_seconds": round(
                 elapsed,
                 6,
@@ -793,7 +905,15 @@ def run_data_pipeline(
 
     if save_output:
         save_processed_data(cleaned_df)
-        save_benchmark_result(comparison)
+
+        # 새 벤치마크를 수행했을 때만 결과 파일을 갱신한다.
+        if (
+            benchmark_was_created
+            or backend != "auto"
+        ):
+            save_benchmark_result(
+                comparison
+            )
 
     return cleaned_df, comparison
 
@@ -802,6 +922,7 @@ def run_data_pipeline(
 # 다른 모듈에서 사용하는 공통 인터페이스
 # ============================================================
 
+# EDA·통계·시각화·모델링 모듈에 동일한 정제 Pandas DataFrame을 제공하는 공통 인터페이스다.
 def load_and_clean(
     path: str | Path = RAW_DATA_PATH,
     backend: Backend = "auto",
@@ -813,7 +934,7 @@ def load_and_clean(
     반환형은 항상 Pandas DataFrame이다.
     """
 
-    cleaned_df,__ = run_data_pipeline(
+    cleaned_df,_ = run_data_pipeline(
         path=path,
         backend=backend,
         save_output=save_output,
