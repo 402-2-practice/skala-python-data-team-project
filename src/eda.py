@@ -34,7 +34,7 @@ from src.config import (
     TABLE_DIR,
     ensure_directories,
 )
-from src.data import load_and_clean, Backend
+from src.data import load_before_cleaning, Backend
 
 # config.py에 아직 별도 상수가 없으므로 EDA 전용 산출물은 여기서 정의한다.
 # 팀에서 경로를 공통 관리하기로 합의하면 config.py로 옮겨도 된다.
@@ -332,7 +332,7 @@ def build_college_income_summary(
         .agg(
             sample_size=(
                 "high_income",
-                "size",
+                "count",
             ),
             high_income_count=(
                 "high_income",
@@ -671,7 +671,7 @@ def build_eda_summary(
                 for column in df.columns
             ],
         },
-        "data_quality_after_cleaning": {
+        "data_quality_before_cleaning": {
             "missing_cells": int(
                 missing_table[
                     "missing_count"
@@ -753,7 +753,7 @@ def build_flat_eda_summary(
 
     dataset = summary["dataset"]
     quality = summary[
-        "data_quality_after_cleaning"
+        "data_quality_before_cleaning"
     ]
     target = summary[
         "target_distribution"
@@ -980,29 +980,15 @@ def run_eda(
     save_output: bool = True,
 ) -> dict[str, Any]:
     """
-    공통 정제 데이터를 받아 EDA 전체 단계를 실행한다.
+    행 제거 전 Adult 데이터를 사용해 EDA를 수행한다.
 
-    Parameters
-    ----------
-    df:
-        이미 정제된 Pandas DataFrame.
-        전체 파이프라인에서 data 단계 결과를 넘기면 재로딩하지 않는다.
-
-    data_path:
-        df가 없을 때 사용할 Adult CSV 경로.
-
-    backend:
-        df가 없을 때 load_and_clean()이 사용할 엔진.
-
-    save_output:
-        True이면 outputs/tables에 결과 파일을 저장한다.
+    df가 전달되지 않으면 문자열과 결측 표현만 정규화한
+    원본 데이터를 불러온다.
     """
 
     if df is None:
-        df = load_and_clean(
+        df = load_before_cleaning(
             path=data_path,
-            backend=backend,
-            save_output=save_output,
         )
     else:
         # 호출한 쪽의 DataFrame을 변경하지 않는다.
@@ -1061,19 +1047,13 @@ def run_eda(
                 numeric_group_summary
             ),
         )
-        
+
     return {
         "summary": summary,
         "tables": {
-            "missing_values": (
-                missing_table
-            ),
-            "duplicate_result": (
-                duplicate_table
-            ),
-            "descriptive_stats": (
-                descriptive_stats
-            ),
+            "missing_values": missing_table,
+            "duplicate_result": duplicate_table,
+            "descriptive_stats": descriptive_stats,
             "categorical_summary": (
                 categorical_summary
             ),

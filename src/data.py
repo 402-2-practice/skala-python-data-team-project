@@ -917,6 +917,53 @@ def run_data_pipeline(
 
     return cleaned_df, comparison
 
+def load_before_cleaning(
+    path: str | Path = RAW_DATA_PATH,
+) -> pd.DataFrame:
+    """
+    행을 제거하기 전의 Adult 데이터를 EDA용으로 반환한다.
+
+    문자열과 결측 표현은 통일하지만,
+    결측·중복·유효 범위에 따른 행 삭제는 수행하지 않는다.
+    """
+
+    result = load_pandas(path)
+
+    # 공백, 빈 문자열, ?, income 끝 마침표만 정리한다.
+    result = _normalize_pandas_strings(
+        result
+    )
+
+    # 유효한 income 값만 0과 1로 변환한다.
+    # 결측값이나 알 수 없는 값은 결측 상태로 유지한다.
+    result["high_income"] = (
+        result["income"]
+        .map(
+            {
+                "<=50K": 0,
+                ">50K": 1,
+            }
+        )
+        .astype("Int8")
+    )
+
+    # education이 결측이면 college_degree도 결측으로 유지한다.
+    college_degree = (
+        result["education"]
+        .isin(COLLEGE_DEGREES)
+        .astype("Int8")
+    )
+
+    college_degree = college_degree.mask(
+        result["education"].isna(),
+        pd.NA,
+    )
+
+    result["college_degree"] = (
+        college_degree
+    )
+
+    return result
 
 # ============================================================
 # 다른 모듈에서 사용하는 공통 인터페이스
