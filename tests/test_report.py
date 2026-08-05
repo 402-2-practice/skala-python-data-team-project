@@ -8,12 +8,13 @@ from src.config import REPORT_PATH, TABLE_DIR, ensure_directories
 from src.report import generate_report
 
 _EDA = {
-    "rows": 100,
-    "columns": 16,
-    "college_degree_pct": 25.0,
-    "high_income_pct": 24.0,
-    "pandas_seconds": 0.01,
-    "polars_seconds": 0.005,
+    "dataset": {"rows": 100, "columns": 16},
+    "college_degree_distribution": {"college_degree_rate": 0.25},
+    "target_distribution": {"high_income_rate": 0.24},
+}
+_BENCHMARK = {
+    "pandas_median_seconds": 0.01,
+    "polars_median_seconds": 0.005,
 }
 _WELCH = {
     "no_degree_mean": 0.15,
@@ -56,6 +57,7 @@ def _write_fixture_json(filename: str, payload: dict) -> None:
 def test_generate_report_combines_all_stage_outputs():
     ensure_directories()
     _write_fixture_json("eda_summary.json", _EDA)
+    _write_fixture_json("data_engine_benchmark.json", _BENCHMARK)
     _write_fixture_json("welch_ttest.json", _WELCH)
     _write_fixture_json("psm_result.json", _PSM)
     _write_fixture_json("psm_sensitivity_result.json", _SENSITIVITY)

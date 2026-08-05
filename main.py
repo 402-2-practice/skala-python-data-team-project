@@ -32,13 +32,13 @@ def main() -> None:
             "adult.csv를 data/raw/adult.csv에 복사하거나 --data 경로를 지정하세요."
         )
 
-    df, load_comparison = load_and_clean(args.data)
+    df = load_and_clean(args.data)
     df.to_csv(PROCESSED_DATA_PATH, index=False)
 
     if args.stage in ["all", "eda"]:
         from src.eda import run_eda
 
-        run_eda(df, load_comparison)
+        run_eda(df)
     if args.stage in ["all", "statistics"]:
         from src.statistics import run_statistics
 
