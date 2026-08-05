@@ -806,17 +806,17 @@ def load_and_clean(
     path: str | Path = RAW_DATA_PATH,
     backend: Backend = "auto",
     save_output: bool = True,
-) -> tuple[pd.DataFrame, dict[str, object]]:
+) -> pd.DataFrame :
     """
     팀의 모든 분석 모듈이 사용하는 공통 함수.
 
     반환형은 항상 Pandas DataFrame이다.
     """
 
-    cleaned_df, df_dict = run_data_pipeline(
+    cleaned_df,__ = run_data_pipeline(
         path=path,
         backend=backend,
         save_output=save_output,
     )
 
-    return cleaned_df, df_dict
+    return cleaned_df
