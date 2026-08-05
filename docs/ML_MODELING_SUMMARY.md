@@ -60,6 +60,7 @@
 - `outputs/tables/model_feature_importance.csv` — 전체 피처 중요도
 - `outputs/tables/model_fairness_by_group.csv` — 전체 집단별 진단
 - `outputs/tables/model_card.json` — 재현용 메타데이터(하이퍼파라미터, 학습 환경, 실행 시각)
+- `outputs/tables/model_predictions.csv` — 테스트셋 개별 예측값(`row_id`,`y_test`,`y_pred`,`y_proba`). 시각화 파트(`model_visualization.py`)의 컨퓨전매트릭스·ROC 커브 입력
 
 ## 알려진 이슈 / 남은 작업
 
