@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 import pandas as pd
 
-from .config import (
+from src.config import (
     DESCRIPTIVE_STATS_PATH,
     DUPLICATE_RESULT_PATH,
     EDA_SUMMARY_PATH,
@@ -1064,7 +1064,7 @@ def run_eda(
                 numeric_group_summary
             ),
         )
-
+        
     return {
         "summary": summary,
         "tables": {
