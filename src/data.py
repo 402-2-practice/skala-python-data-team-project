@@ -1,3 +1,14 @@
+"""Adult Income 데이터 로딩, 정제 및 Pandas/Polars 성능 비교.
+
+main.py에서 사용 시 : 
+
+cleaned_df, comparison = run_data_pipeline()
+
+반환 값 : 
+cleaned_df : 정제된 pandas.DataFrame
+comparison : Pandas/Polars 성능 비교 딕셔너리
+"""
+
 from __future__ import annotations
 
 import json
@@ -916,14 +927,14 @@ def load_and_clean(
     path: str | Path = RAW_DATA_PATH,
     backend: Backend = "auto",
     save_output: bool = True,
-) -> pd.DataFrame:
+) -> pd.DataFrame :
     """
     팀의 모든 분석 모듈이 사용하는 공통 함수.
 
     반환형은 항상 Pandas DataFrame이다.
     """
 
-    cleaned_df,__ = run_data_pipeline(
+    cleaned_df,_ = run_data_pipeline(
         path=path,
         backend=backend,
         save_output=save_output,
