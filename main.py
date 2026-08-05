@@ -48,9 +48,11 @@ def main() -> None:
 
         create_visualizations(df)
     if args.stage in ["all", "model"]:
+        from src.model_visualization import create_model_visualizations
         from src.modeling import train_income_model
 
         train_income_model(df)
+        create_model_visualizations()
     if args.stage == "all":
         from src.report import generate_report
 

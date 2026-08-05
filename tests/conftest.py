@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import pytest
 
+import src.model_visualization as model_visualization
 import src.modeling as modeling
 import src.report as report
 import src.statistics as statistics
@@ -26,7 +27,7 @@ def isolate_output_paths(tmp_path, monkeypatch):
     for directory in (table_dir, model_dir, figure_dir):
         directory.mkdir(parents=True, exist_ok=True)
 
-    for module in (modeling, report, statistics, visualization):
+    for module in (modeling, model_visualization, report, statistics, visualization):
         if hasattr(module, "TABLE_DIR"):
             monkeypatch.setattr(module, "TABLE_DIR", table_dir)
 
@@ -34,5 +35,7 @@ def isolate_output_paths(tmp_path, monkeypatch):
         monkeypatch.setattr(modeling, "MODEL_DIR", model_dir)
     if hasattr(visualization, "FIGURE_DIR"):
         monkeypatch.setattr(visualization, "FIGURE_DIR", figure_dir)
+    if hasattr(model_visualization, "FIGURE_DIR"):
+        monkeypatch.setattr(model_visualization, "FIGURE_DIR", figure_dir)
     if hasattr(report, "REPORT_PATH"):
         monkeypatch.setattr(report, "REPORT_PATH", tmp_path / "report.md")
