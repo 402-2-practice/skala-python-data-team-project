@@ -1,3 +1,9 @@
+"""프로젝트 공통 경로·설정 상수.
+
+담당: 윤찬웅 (데이터·EDA, 공통 설정 기본 소유자) — docs/TEAM_WORKFLOW.md 공통 기능 소유권 참고.
+열 이름을 추가·삭제·변경하는 PR은 최소 두 명이 리뷰한다.
+"""
+
 from pathlib import Path
 
 

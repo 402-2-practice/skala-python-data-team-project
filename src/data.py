@@ -1,6 +1,8 @@
 """Adult Income 데이터 로딩, 정제 및 Pandas/Polars 성능 비교.
 
-main.py에서 사용 시 : 
+담당: 윤찬웅 (데이터·EDA)
+
+main.py에서 사용 시 :
 
 cleaned_df, comparison = run_data_pipeline()
 

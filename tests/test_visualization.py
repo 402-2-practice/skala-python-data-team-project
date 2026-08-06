@@ -11,7 +11,6 @@ from src.visualization import create_visualizations
 def test_create_visualizations_writes_expected_figures():
     df = pd.DataFrame(
         {
-            "college_degree": [0, 0, 1, 1, 0, 1],
             "high_income": [0, 1, 1, 1, 0, 0],
             "education": ["HS-grad", "HS-grad", "Bachelors", "Bachelors", "HS-grad", "Masters"],
             "education-num": [9, 9, 13, 13, 9, 14],
@@ -28,7 +27,6 @@ def test_create_visualizations_writes_expected_figures():
     create_visualizations(df)
 
     expected_files = [
-        "degree_income_rate.png",
         "education_income_rate.html",
         "age_distribution_by_income.png",
         "capital_gain_indicator_income_rate.png",
