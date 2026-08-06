@@ -129,6 +129,8 @@ def plot_capital_gain_indicator(df: pd.DataFrame) -> None:
             f"{bar.get_height():.1f}%",
             ha="center",
         )
+    ax.margins(y=0.15)
+    
     plt.tight_layout()
     plt.savefig(FIGURE_DIR / "capital_gain_indicator_income_rate.png", dpi=160)
     plt.close()
@@ -179,11 +181,30 @@ def plot_psm_balance() -> None:
 
     balance: pd.DataFrame = pd.read_csv(psm_balance_path)
     non_missing_dummy = ~balance["covariate"].str.endswith("_nan")
-    top_balance: pd.DataFrame = (
+    balance = balance.copy()
+
+    balance["max_smd"] = (
+        balance[
+            [
+                "smd_before",
+                "smd_after",
+            ]
+        ]
+        .abs()
+        .max(axis=1)
+    )
+
+    top_balance = (
         balance.loc[non_missing_dummy]
-        .sort_values(by="smd_before", ascending=False)
+        .sort_values(
+            by="max_smd",
+            ascending=False,
+        )
         .head(15)
-        .sort_values(by="smd_before")
+        .sort_values(
+            by="max_smd",
+            ascending=True,
+        )
         .reset_index(drop=True)
     )
     y_pos = range(len(top_balance))

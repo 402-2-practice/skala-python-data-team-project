@@ -9,8 +9,21 @@ import json
 
 import pandas as pd
 
-from src.config import REPORT_PATH, TABLE_DIR
+from src.config import PROCESSED_DATA_PATH, REPORT_PATH, TABLE_DIR
 
+def _read_processed_data() -> pd.DataFrame:
+    """통계·모델링에 사용된 공통 정제 데이터를 읽는다."""
+
+    if not PROCESSED_DATA_PATH.exists():
+        raise FileNotFoundError(
+            "정제 데이터가 없습니다: "
+            f"{PROCESSED_DATA_PATH}. "
+            "report 생성 전에 데이터 파이프라인을 실행하세요."
+        )
+
+    return pd.read_csv(
+        PROCESSED_DATA_PATH
+    )
 
 def _read_json(filename: str) -> dict:
     return json.loads((TABLE_DIR / filename).read_text(encoding="utf-8"))
@@ -21,6 +34,12 @@ def _read_correlations() -> pd.DataFrame:
 
 
 def generate_report() -> None:
+
+    cleaned = _read_processed_data()
+    cleaned_rows = len(cleaned)
+    cleaned_high_income_rate = float(cleaned["high_income"].mean())
+    cleaned_degree_rate = float(cleaned["college_degree"].mean())
+    
     eda = _read_json("eda_summary.json")
     benchmark = _read_json("data_engine_benchmark.json")
     test = _read_json("welch_ttest.json")
@@ -50,11 +69,13 @@ def generate_report() -> None:
 
 ## 데이터
 
-- 정제 후 표본: {eda['dataset']['rows']:,}명
-- 대학 학위 보유 비율: {eda['college_degree_distribution']['college_degree_rate'] * 100:.2f}%
-- 전체 고소득 비율: {eda['target_distribution']['high_income_rate'] * 100:.2f}%
-- Pandas 로딩 시간: {benchmark['pandas_median_seconds']:.6f}초
-- Polars 로딩 시간: {benchmark['polars_median_seconds']:.6f}초
+- 행 제거 전 표본: {eda['dataset']['rows']:,}명
+- 정제 후 분석 표본: {cleaned_rows:,}명
+- 정제 후 대학 학위 보유 비율: {cleaned_degree_rate * 100:.2f}%
+- 정제 후 전체 고소득 비율: {cleaned_high_income_rate * 100:.2f}%
+- Pandas 로딩·정제 시간: {benchmark['pandas_median_seconds']:.6f}초
+- Polars 로딩·정제 시간: {benchmark['polars_median_seconds']:.6f}초
+- 자동 선택 엔진: {benchmark['selected_engine']}
 
 ### 학력별 고소득률
 
@@ -77,7 +98,7 @@ def generate_report() -> None:
 - 비학위 집단 고소득률: {test['no_degree_mean']:.2%}
 - 학위 집단 고소득률: {test['degree_mean']:.2%}
 - 단순 비율 차이: {test['mean_difference'] * 100:.2f}%p
-- p-value: {test['p_value']:.6g}
+- p-value: {test['p_value_display']}
 
 Welch t-test에서 두 집단의 평균 차이는 {significance}. 다만 이 결과만으로 인과관계를 주장할 수는 없다.
 
@@ -87,7 +108,7 @@ Welch t-test에서 두 집단의 평균 차이는 {significance}. 다만 이 결
 - 비학위 집단 고소득률: {psm['matched_no_degree_rate']:.2%}
 - 학위 집단 고소득률: {psm['matched_degree_rate']:.2%}
 - 매칭 후 비율 차이: {psm['matched_rate_difference'] * 100:.2f}%p
-- p-value: {psm['p_value']:.6g}
+- p-value: {psm['p_value_display']}
 - 최대 SMD(매칭 전 → 후): {psm['max_smd_before']:.3f} → {psm['max_smd_after']:.3f}
 
 PSM은 교육 이전에 정해진 것으로 볼 수 있는 age, sex, race, native-country를 이용했다. 관측된 변수에 대해서만 집단을 비슷하게 만들며, 측정되지 않은 가정환경, 능력, 지역, 교육비 등의 교란요인은 통제하지 못한다. 따라서 결과는 인과효과의 확정적 증명이 아니라 조건부 연관성으로 해석한다.
@@ -99,7 +120,7 @@ PSM은 교육 이전에 정해진 것으로 볼 수 있는 age, sex, race, nativ
 - 비학위 집단 고소득률: {sensitivity['matched_no_degree_rate']:.2%}
 - 학위 집단 고소득률: {sensitivity['matched_degree_rate']:.2%}
 - 조건부 비율 차이: {sensitivity['matched_rate_difference'] * 100:.2f}%p
-- p-value: {sensitivity['p_value']:.6g}
+- p-value: {sensitivity['p_value_display']}
 - 최대 SMD(매칭 전 → 후): {sensitivity['max_smd_before']:.3f} → {sensitivity['max_smd_after']:.3f}
 
 이 결과는 현재 직업과 근무시간이 같은 사람 사이에서 남는 학위의 조건부 연관성을 뜻한다. 주 PSM과 차이가 크다면 직업·근무시간이 학위와 소득을 연결하는 경로일 가능성을 제시하지만, 별도의 매개효과 분석 없이 그 경로를 확정하지 않는다.
