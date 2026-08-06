@@ -1,8 +1,10 @@
-"""src.report.generate_report()가 다섯 개 JSON 산출물을 report.md로 정확히 합치는지 검증한다."""
+"""src.report.generate_report()가 JSON·상관계수 산출물을 report.md로 정확히 합치는지 검증한다."""
 
 from __future__ import annotations
 
 import json
+
+import pandas as pd
 
 import src.report as report
 
@@ -47,6 +49,17 @@ _MODEL = {
     "f1": 0.69,
     "roc_auc": 0.91,
 }
+_CORRELATION_COLUMNS = ["high_income", "college_degree", "education-num", "age"]
+_CORRELATIONS = pd.DataFrame(
+    [
+        [1.00, 0.35, 0.33, 0.20],
+        [0.35, 1.00, 0.60, 0.05],
+        [0.33, 0.60, 1.00, 0.10],
+        [0.20, 0.05, 0.10, 1.00],
+    ],
+    index=_CORRELATION_COLUMNS,
+    columns=_CORRELATION_COLUMNS,
+)
 
 
 def _write_fixture_json(filename: str, payload: dict) -> None:
@@ -62,6 +75,7 @@ def test_generate_report_combines_all_stage_outputs():
     _write_fixture_json("psm_result.json", _PSM)
     _write_fixture_json("psm_sensitivity_result.json", _SENSITIVITY)
     _write_fixture_json("model_metrics.json", _MODEL)
+    _CORRELATIONS.to_csv(report.TABLE_DIR / "correlations.csv")
 
     report.generate_report()
 
@@ -72,3 +86,5 @@ def test_generate_report_combines_all_stage_outputs():
     assert "40" in content  # matched_pairs
     # 인과관계를 확정적으로 증명했다고 표현하지 않는다는 해석 원칙이 실제로 report에 들어가는지 확인한다.
     assert "확정적 증명이 아니" in content
+    # high_income과의 상관계수 표가 절댓값 큰 순으로 정렬되어 들어가는지 확인한다.
+    assert "| college_degree | 0.350 |" in content
