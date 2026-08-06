@@ -117,7 +117,7 @@ ADULT_COLUMNS = [
     "capital-loss",
     "hours-per-week",
     "native-country",
-    "income"
+    "income",
 ]
 
 
@@ -160,7 +160,7 @@ def ensure_directories() -> None:
         PROCESSED_DIR,
         FIGURE_DIR,
         TABLE_DIR,
-        MODEL_DIR
+        MODEL_DIR,
     ]:
 
         directory.mkdir(parents=True, exist_ok=True)

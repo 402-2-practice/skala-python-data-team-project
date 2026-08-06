@@ -8,7 +8,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from src.config import PROCESSED_DATA_PATH, RAW_DATA_PATH, ensure_directories
+from src.config import RAW_DATA_PATH, ensure_directories
 from src.data import load_and_clean
 
 
@@ -36,12 +36,11 @@ def main() -> None:
         )
 
     df = load_and_clean(args.data)
-    df.to_csv(PROCESSED_DATA_PATH, index=False)
 
     if args.stage in ["all", "eda"]:
         from src.eda import run_eda
 
-        run_eda(df)
+        run_eda(data_path=args.data,)
     if args.stage in ["all", "statistics"]:
         from src.statistics import run_statistics
 

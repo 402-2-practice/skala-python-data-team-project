@@ -866,7 +866,7 @@ def run_data_pipeline(
         comparison = {
             "selected_engine": "pandas",
             "benchmark_reused": False,
-            "pandas_median_seconds": round(
+            "pandas_run_seconds": round(
                 elapsed,
                 6,
             ),
@@ -887,7 +887,7 @@ def run_data_pipeline(
         comparison = {
             "selected_engine": "polars",
             "benchmark_reused": False,
-            "polars_median_seconds": round(
+            "polars_run_seconds": round(
                 elapsed,
                 6,
             ),
