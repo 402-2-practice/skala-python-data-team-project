@@ -1,6 +1,6 @@
 """예측 모델 진단 시각화 — Accuracy/Precision/Recall/F1, ROC curve, Confusion matrix.
 
-담당: 이서현(시각화·보고서)
+담당: 이서현 (시각화·보고서)
 
 modeling.py의 train_income_model()이 저장한 산출물(model_metrics.json,
 model_predictions.csv)에 의존하므로, main.py에서 model 단계 이후에 호출해야 한다.

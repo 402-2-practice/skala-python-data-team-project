@@ -1,6 +1,7 @@
 """Seaborn 정적 시각화와 Plotly 인터랙티브 시각화 — 주제 중심(학위·소득·PSM) 차트.
 
-담당: 이서현(시각화·보고서)
+담당: 이서현 (시각화·보고서)
+
 예측 모델 진단 차트(성능 지표/ROC curve/confusion matrix)는 model 단계 산출물에 의존하므로
 src/model_visualization.py로 분리했다. main.py에서 model 단계 이후에 호출해야 한다.
 """
@@ -28,39 +29,6 @@ def _require_columns(df: pd.DataFrame, columns: list[str], chart_name: str) -> N
     missing = [column for column in columns if column not in df.columns]
     if missing:
         raise ValueError(f"{chart_name}에 필요한 컬럼이 없습니다: {missing}")
-
-
-# ============================================================
-# [그룹 비교] 대학 학위별 고소득률 막대그래프 (Seaborn)
-# - x축: college_degree(학위 유무), y축: high_income_rate(%)
-# ============================================================
-def plot_degree_income_rate(df: pd.DataFrame) -> None:
-    _require_columns(df, ["college_degree", "high_income"], "plot_degree_income_rate")
-    degree_rate = (
-        df.groupby("college_degree", observed=True)["high_income"]
-        .mean()
-        .mul(100)
-        .rename("high_income_rate")
-        .reset_index()
-    )
-    degree_rate["degree_label"] = degree_rate["college_degree"].map(
-        {0: "No college degree", 1: "College degree"}
-    )
-
-    plt.figure(figsize=(7, 5))
-    ax = sns.barplot(data=degree_rate, x="degree_label", y="high_income_rate", hue="degree_label", legend=False)
-    ax.set(title="High-income rate by college degree", xlabel="Degree group", ylabel="High-income rate (%)")
-    for patch in ax.patches:
-        bar = cast(Rectangle, patch)
-        ax.text(
-            bar.get_x() + bar.get_width() / 2,
-            bar.get_height() + 1,
-            f"{bar.get_height():.1f}%",
-            ha="center",
-        )
-    plt.tight_layout()
-    plt.savefig(FIGURE_DIR / "degree_income_rate.png", dpi=160)
-    plt.close()
 
 
 # ============================================================
@@ -294,7 +262,6 @@ def plot_effect_comparison() -> None:
 def create_visualizations(df: pd.DataFrame) -> None:
     sns.set_theme(style="whitegrid")
 
-    plot_degree_income_rate(df)
     plot_education_income_rate(df)
     plot_age_distribution(df)
     plot_capital_gain_indicator(df)

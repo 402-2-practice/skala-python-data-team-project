@@ -3,7 +3,7 @@
 담당: 정민규  
 브랜치: `feat/statistics-psm`  
 주요 소유 파일: `src/statistics.py`  
-현재 상태: 로컬 구현 및 통계 단위 검증 완료, 커밋·PR 미생성
+현재 상태: PR #6으로 merge 완료, `main`에서 전체 파이프라인·pytest 정상 동작 확인
 
 ## 1. 담당 TASK
 
@@ -141,35 +141,27 @@ ML 담당 결과에서 `college_degree` 또는 `education`의 permutation import
 | `psm_sensitivity_matched_sample.csv` | 민감도 매칭 표본 |
 | `statistics_summary.json` | 통계 결과와 해석을 합친 전달용 요약 |
 
-## 6. 검증 현황
+## 6. 검증 현황 (2026-08-06 재확인)
 
-- `src/statistics.py` 문법 검사 통과
-- 실제 Adult 데이터에서 `run_statistics()` 실행 성공
-- PR #4의 수정된 `main.py --stage statistics` 연결 상태에서 실행 성공
-- PR #4 `tests/test_statistics.py`의 세 가지 assertion을 동일하게 실행해 3/3 통과
+- `src/statistics.py`가 `main`에 merge되어 `python main.py` 전체 파이프라인에서 정상 실행됨
+- `python -m pytest -q` 기준 `tests/test_statistics.py` 포함 전체 17개 테스트 전부 통과
   - 명확한 집단 차이 검출
   - 동일 집단에서 유의하지 않음 확인
   - PSM 이후 SMD가 개선됨을 확인
-
-현재 로컬 환경에는 `pytest`가 없어 pytest 명령 자체는 실행하지 못했다. PR #4가 merge되고 pytest가 설치된 환경에서 다음 명령으로 정식 확인한다.
-
-```bash
-python -m pytest -q tests/test_statistics.py
-python -m pytest -q
-python main.py
-```
+- 실제 Adult 데이터 실행 결과: 매칭 전 차이 32.43%p → 주 PSM 이후 27.44%p(최대 SMD 0.224→0.046) →
+  민감도 분석 18.02%p(최대 SMD 0.941→0.082), 아래 8절 핵심 문장과 일치
 
 ## 7. 남은 To-Do
 
-- [ ] PR #4 merge 이후 최신 `main`을 다시 반영한다.
-- [ ] pytest를 설치하고 `tests/test_statistics.py`를 정식 실행한다.
-- [ ] 전체 14개 테스트를 실행한다.
-- [ ] PR #4의 `main.py` 연결 수정과 함께 전체 파이프라인을 실행한다.
-- [ ] 시각화 담당자에게 두 balance CSV와 매칭 전후 비율을 전달한다.
-- [ ] 보고서 담당자에게 추가 JSON 필드와 해석 문장을 전달한다.
-- [ ] 팀과 대학 학위 정의 및 PSM 공변량 선택을 최종 합의한다.
-- [ ] 필요하면 학사 대 고졸 표본만 사용한 강건성 분석을 추가한다.
-- [ ] 최종 결과에서 “원인 증명” 대신 “관측 변수 조정 후 연관성” 표현을 확인한다.
+- [x] PR #6 merge 이후 최신 `main`을 다시 반영한다.
+- [x] pytest를 설치하고 `tests/test_statistics.py`를 정식 실행한다.
+- [x] 전체 테스트를 실행한다. (현재 17개 전부 통과)
+- [x] `main.py` 연결과 함께 전체 파이프라인을 실행한다.
+- [x] 시각화 담당자에게 두 balance CSV와 매칭 전후 비율을 전달한다. (`src/visualization.py`의 PSM 관련 차트가 이 산출물을 사용)
+- [x] 보고서 담당자에게 추가 JSON 필드와 해석 문장을 전달한다. (`report.md`가 `psm_result.json`/`psm_sensitivity_result.json` 필드를 그대로 사용)
+- [x] 팀과 대학 학위 정의 및 PSM 공변량 선택을 최종 합의한다. (`docs/ANALYSIS_DESIGN.md`에 확정 내용 반영됨)
+- [x] 최종 결과에서 “원인 증명” 대신 “관측 변수 조정 후 연관성” 표현을 확인한다. (`report.md`에 반영됨)
+- [ ] (선택) 학사 대 고졸 표본만 사용한 강건성 분석 — 시간이 되면 추가 검토, 필수는 아님
 
 ## 8. 보고 시 핵심 문장
 

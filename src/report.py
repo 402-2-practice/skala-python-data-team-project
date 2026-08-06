@@ -1,5 +1,5 @@
 """분석 산출물을 읽어 report.md를 자동 생성한다.
-담당: 이서현(시각화·보고서)
+담당: 이서현 (시각화·보고서)
 """
 
 from __future__ import annotations

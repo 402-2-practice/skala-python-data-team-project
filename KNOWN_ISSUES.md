@@ -1,9 +1,12 @@
-# 데이터 파이프라인 결함 목록
+# 데이터 파이프라인 결함 목록 (해결됨)
 
 > 작성: 원광식(ML 모델링) 담당, `feat/modeling` 브랜치에서 `python main.py` 실행 중 발견.
 > `src/data.py`, `src/config.py`는 윤찬웅 담당 파일이라 직접 수정하지 않고 여기에 정리만 함.
 > `main.py` 연결은 고동민(테스트·통합·문서 QA) 담당이라 최종 반영은 그쪽에서.
-> 각 항목에 코멘트/체크 남겨주세요.
+>
+> **2026-08-06 업데이트**: 아래 3건 모두 `feat/data`(PR #12), `feat/wire-model-visualization`(PR #11)에서
+> 해결되어 `main`에 merge됨. `python main.py` 전체 파이프라인이 처음부터 끝까지 에러 없이 실행되고,
+> pandas/polars 행 수도 32,561행으로 일치함을 재확인했다. 과거 기록 보존을 위해 원문은 남겨둔다.
 
 ## 1. `src/data.py` import 경로 오류 (즉시 크래시)
 
@@ -29,7 +32,7 @@ from config import (
 
 **제안**: `from config` → `from src.config`로 변경.
 
-**상태**: 미해결
+**상태**: 해결됨 — 현재 `src/data.py`는 `from src.config import (...)`로 수정되어 있음.
 
 ---
 
@@ -55,7 +58,8 @@ df, load_comparison = load_and_clean(args.data)
 - (a) `run_data_pipeline`을 유지하고 `main.py`에서 그에 맞게 호출부만 수정 (main.py는 고동민 담당이라 윤찬웅·고동민 협의 후 진행)
 - (b) 함수명을 다시 `load_and_clean`으로 되돌려서 기존 계약 유지
 
-**상태**: 미해결 (함수명 확정 필요 — A 코멘트 요청)
+**상태**: 해결됨 — (b)로 확정. `src/data.py`에 `load_and_clean(path)`이 다시 정의되어 있고
+`main.py`도 그대로 `from src.data import load_and_clean`으로 호출함.
 
 ---
 
@@ -77,7 +81,9 @@ print(df.shape)   # (32562, 15)  <- pandas는 (32561, 15)
 
 **제안**: `load_data_polars`에서 `has_header=False`, `new_columns=ADULT_COLUMNS` 제거하고 기본 옵션(헤더 자동 인식)으로 읽기.
 
-**상태**: 미해결
+**상태**: 해결됨 — `src/config.py`의 `CSV_HAS_HEADER = True`를 읽어 pandas/polars 둘 다 헤더를 인식하도록 수정됨.
+현재 `outputs/tables/data_engine_benchmark.json`에서 `pandas_rows == polars_rows == 32561`,
+`results_match: true`로 재확인함.
 
 ---
 
