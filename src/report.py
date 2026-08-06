@@ -7,11 +7,17 @@ from __future__ import annotations
 from datetime import datetime
 import json
 
+import pandas as pd
+
 from src.config import REPORT_PATH, TABLE_DIR
 
 
 def _read_json(filename: str) -> dict:
     return json.loads((TABLE_DIR / filename).read_text(encoding="utf-8"))
+
+
+def _read_correlations() -> pd.DataFrame:
+    return pd.read_csv(TABLE_DIR / "correlations.csv", index_col=0)
 
 
 def generate_report() -> None:
@@ -21,6 +27,17 @@ def generate_report() -> None:
     psm = _read_json("psm_result.json")
     sensitivity = _read_json("psm_sensitivity_result.json")
     model = _read_json("model_metrics.json")
+    correlations = _read_correlations()
+
+    # high_income과의 상관계수만 뽑아 절댓값 큰 순으로 정렬 — 8x8 전체 행렬을
+    # 표로 나열하면 가독성이 떨어지므로, 목표변수와의 관계로 좁혀서 보여준다.
+    # 전체 조합은 correlation_heatmap.png로 별도 확인할 수 있다.
+    income_correlation = (
+        correlations["high_income"].drop("high_income").sort_values(key=abs, ascending=False)
+    )
+    correlation_rows = "\n".join(
+        f"| {name} | {value:.3f} |" for name, value in income_correlation.items()
+    )
 
     significance = "통계적으로 유의했다" if test["significant_at_0_05"] else "통계적으로 유의하지 않았다"
     report = f"""# 대학 학위, 정말 값어치가 있을까?
@@ -42,6 +59,18 @@ def generate_report() -> None:
 ### 학력별 고소득률
 
 [인터랙티브 차트 열기](outputs/figures/education_income_rate.html)
+
+## 상관관계
+
+수치형 변수 간 피어슨 상관계수를 계산했다. 고소득 여부(high_income)와의 상관은 다음과 같다.
+
+| 변수 | 상관계수 |
+|---|---|
+{correlation_rows}
+
+`education-num`(교육 연수)과 `college_degree`(대학 학위 보유)가 고소득과 가장 강하게 연관되어 있다. 다만 상관계수는 선형적 연관성일 뿐 인과관계를 의미하지 않으며, 다른 변수와의 교란 가능성은 이어지는 매칭 분석에서 다룬다. 전체 변수 조합의 상관관계는 히트맵으로 확인할 수 있다.
+
+![상관관계 히트맵](outputs/figures/correlation_heatmap.png)
 
 ## 매칭 전 비교
 
