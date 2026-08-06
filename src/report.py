@@ -1,4 +1,6 @@
-"""분석 산출물을 읽어 report.md를 자동 생성한다."""
+"""분석 산출물을 읽어 report.md를 자동 생성한다.
+담당: 이서현(시각화·보고서)
+"""
 
 from __future__ import annotations
 
@@ -36,6 +38,10 @@ def generate_report() -> None:
 - 전체 고소득 비율: {eda['target_distribution']['high_income_rate'] * 100:.2f}%
 - Pandas 로딩 시간: {benchmark['pandas_median_seconds']:.6f}초
 - Polars 로딩 시간: {benchmark['polars_median_seconds']:.6f}초
+
+### 학력별 고소득률
+
+[인터랙티브 차트 열기](outputs/figures/education_income_rate.html)
 
 ## 매칭 전 비교
 
@@ -79,11 +85,17 @@ PSM은 교육 이전에 정해진 것으로 볼 수 있는 age, sex, race, nativ
 
 예측 모델은 고소득 여부를 예측하는 보조 분석이다. 예측력이 높은 것과 대학 학위의 인과효과가 크다는 것은 서로 다른 주장이다.
 
-## 시각화
+### 혼동행렬
 
-![대학 학위별 고소득률](outputs/figures/degree_income_rate.png)
+![모델 혼동행렬](outputs/figures/model_confusion_matrix.png)
 
-인터랙티브 차트: `outputs/figures/education_income_rate.html`
+테스트 데이터의 실제 소득 등급과 모델이 예측한 소득 등급을 비교한다.
+
+### ROC 곡선
+
+![모델 ROC 곡선](outputs/figures/model_roc_curve.png)
+
+분류 임계값에 따른 거짓 양성률과 참 양성률의 관계를 보여준다.
 """
     REPORT_PATH.write_text(report, encoding="utf-8")
     print(f"\n[리포트] 생성 완료: {REPORT_PATH}")

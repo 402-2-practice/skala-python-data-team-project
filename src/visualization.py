@@ -1,5 +1,6 @@
 """Seaborn 정적 시각화와 Plotly 인터랙티브 시각화 — 주제 중심(학위·소득·PSM) 차트.
 
+담당: 이서현(시각화·보고서)
 예측 모델 진단 차트(성능 지표/ROC curve/confusion matrix)는 model 단계 산출물에 의존하므로
 src/model_visualization.py로 분리했다. main.py에서 model 단계 이후에 호출해야 한다.
 """
