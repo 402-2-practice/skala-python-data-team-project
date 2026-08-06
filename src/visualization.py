@@ -12,6 +12,7 @@ import json
 from typing import cast
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import plotly.express as px
 import seaborn as sns
@@ -46,7 +47,8 @@ def plot_education_income_rate(df: pd.DataFrame) -> None:
         .reset_index()
         .sort_values("education-num")
     )
-    education_rate["high_income_rate"] = education_rate["mean"] * 100
+    # round(2)로 반올림 
+    education_rate["high_income_rate"] = (education_rate["mean"] * 100).round(2)
     fig = px.bar(
         education_rate,
         x="education",
@@ -140,10 +142,12 @@ def plot_capital_gain_indicator(df: pd.DataFrame) -> None:
 # ============================================================
 def plot_race_sex_income_rate(df: pd.DataFrame) -> None:
     _require_columns(df, ["race", "sex", "high_income"], "plot_race_sex_income_rate")
+    # round(2)로 반올림 
     sex_race_rate = (
         df.groupby(["race", "sex"], observed=True)["high_income"]
         .mean()
         .mul(100)
+        .round(2)
         .rename("high_income_rate")
         .reset_index()
     )
@@ -226,24 +230,29 @@ def plot_effect_comparison() -> None:
 
     # welch/psm 결과의 effect는 0.32 같은 비율(fraction)이라, 그대로 쓰면 "0.32%"인지
     # "32%p"인지 헷갈린다. 100을 곱해 %p(백분위 포인트) 단위로 명시한다.
+    # effect_pp는 round(2)로 hover 소수점을 줄인다. p_value는 statistics.py가
+    # p_value == 0(1e-300 미만이라 float64 표현 범위를 벗어나 0으로 언더플로된 경우)을
+    # "< 1e-300" 문자열로 바꿔둔 p_value_display를 그대로 쓴다 — raw p_value(float)를
+    # 그대로 hover에 포맷하면 0.0인 값은 어떤 소수점/유효숫자 포맷을 적용해도 그대로
+    # "0"으로 찍혀 유의성 정보가 사라진다.
     effect_summary = pd.DataFrame(
         [
             {
                 "stage": "1. Naive comparison",
-                "effect_pp": welch["mean_difference"] * 100,
-                "p_value": welch["p_value"],
+                "effect_pp": round(welch["mean_difference"] * 100, 2),
+                "p_value": welch["p_value_display"],
                 "sample_note": "all rows (unmatched)",
             },
             {
                 "stage": "2. Main PSM",
-                "effect_pp": psm["matched_rate_difference"] * 100,
-                "p_value": psm["p_value"],
+                "effect_pp": round(psm["matched_rate_difference"] * 100, 2),
+                "p_value": psm["p_value_display"],
                 "sample_note": f"{psm['matched_pairs']} matched pairs",
             },
             {
                 "stage": "3. Sensitivity PSM",
-                "effect_pp": sensitivity["matched_rate_difference"] * 100,
-                "p_value": sensitivity["p_value"],
+                "effect_pp": round(sensitivity["matched_rate_difference"] * 100, 2),
+                "p_value": sensitivity["p_value_display"],
                 "sample_note": f"{sensitivity['matched_pairs']} matched pairs",
             },
         ]
@@ -259,6 +268,41 @@ def plot_effect_comparison() -> None:
     fig.write_html(FIGURE_DIR / "effect_size_comparison.html", include_plotlyjs="cdn")
 
 
+# ============================================================
+# [분포] 수치형 변수 상관관계 히트맵 (Seaborn)
+# - statistics.py가 저장한 correlations.csv 사용 (수치형 컬럼 전체 상관계수 행렬)
+# - 대각선 위 삼각형은 아래 삼각형과 대칭이라 마스킹해 중복 정보를 없앰
+# - 상관계수는 -1~1의 방향성 있는 값이라 0을 중심으로 하는 발산형 컬러맵 사용
+# - statistics 단계를 먼저 실행해야 파일이 존재 — 없으면 경고만 출력하고 건너뜀
+# ============================================================
+def plot_correlation_heatmap() -> None:
+    correlations_path = TABLE_DIR / "correlations.csv"
+    if not correlations_path.exists():
+        print("[시각화 경고] correlations.csv가 없습니다. statistics 단계를 먼저 실행하세요.")
+        return
+
+    correlations = pd.read_csv(correlations_path, index_col=0)
+    mask = np.triu(np.ones_like(correlations, dtype=bool), k=1)
+    plt.figure(figsize=(9, 8))
+    ax = sns.heatmap(
+        correlations,
+        mask=mask,
+        cmap="coolwarm",
+        vmin=-1,
+        vmax=1,
+        center=0,
+        annot=True,
+        fmt=".2f",
+        square=True,
+        linewidths=0.5,
+        cbar_kws={"label": "Correlation coefficient"},
+    )
+    ax.set_title("Correlation heatmap of numeric features")
+    plt.tight_layout()
+    plt.savefig(FIGURE_DIR / "correlation_heatmap.png", dpi=160)
+    plt.close()
+
+
 def create_visualizations(df: pd.DataFrame) -> None:
     sns.set_theme(style="whitegrid")
 
@@ -268,3 +312,4 @@ def create_visualizations(df: pd.DataFrame) -> None:
     plot_race_sex_income_rate(df)
     plot_psm_balance()
     plot_effect_comparison()
+    plot_correlation_heatmap()
