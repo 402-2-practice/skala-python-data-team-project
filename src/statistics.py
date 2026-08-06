@@ -467,6 +467,15 @@ def run_statistics(df: pd.DataFrame) -> tuple[dict, dict]:
     """
     numeric = df.select_dtypes(include="number")
     numeric.corr().to_csv(TABLE_DIR / "correlations.csv")
+
+    """
+    Date: 06AUG2026
+    Author: Jung Minkyu
+    Purpose: fix: 상관계수 행렬 콘솔에 출력하기
+    """
+    print("\n[통계] 수치형 변수 간 상관계수 행렬:")
+    print(numeric.corr().to_string())
+
     test_result = welch_test(df)
     _, psm_result = propensity_score_matching(df, output_prefix="psm")
     _, sensitivity_result = propensity_score_matching(
