@@ -40,8 +40,8 @@ def main() -> None:
     if args.stage in ["all", "eda"]:
         from src.eda import run_eda
 
-        run_eda(df)
-    if args.stage in ["all", "statistics"]:
+        run_eda(data_path=args.data,)
+    if args.stage in ["all", "statistics", "visualization",]:
         from src.statistics import run_statistics
 
         run_statistics(df)

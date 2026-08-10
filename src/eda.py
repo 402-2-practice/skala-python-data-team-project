@@ -2,13 +2,16 @@
 
 담당: 윤찬웅 (데이터·EDA)
 
-이 모듈은 데이터 정제를 직접 수행하지 않는다.
-모든 분석은 ``src.data.load_and_clean()``이 반환한 공통 정제 데이터를 사용한다.
+이 모듈은 결측 행, 중복 행 및 유효 범위 밖의 행을 직접 제거하지 않는다.
 
-main.py에서 사용 시 : 
+EDA는 ``src.data.load_before_cleaning()``이 반환하는 데이터를 사용한다.
+이 데이터는 문자열과 결측 표현만 정규화된 상태이며,
+결측·중복·유효성 기준에 따른 행 삭제는 수행되지 않은 상태다.
+
+main.py에서 사용 시:
 
 eda_result = run_eda(
-    df=cleaned_df
+    data_path=RAW_DATA_PATH,
 )
 
 반환 값 : 
@@ -23,7 +26,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import pandas as pd
 
@@ -101,21 +104,30 @@ def validate_eda_input(df: pd.DataFrame) -> None:
             f"{missing_columns}"
         )
 
-    for column in ("high_income", "college_degree"):
-        values = set(
-            df[column]
-            .dropna()
-            .astype(int)
-            .unique()
-            .tolist()
+
+    for column in (
+        "high_income",
+        "college_degree",
+    ):
+        invalid_mask = (
+            df[column].notna()
+            & ~df[column].isin([0, 1])
         )
 
-        if not values.issubset({0, 1}):
-            raise ValueError(
-                f"{column}은 0과 1만 포함해야 합니다. "
-                f"현재 값: {sorted(values)}"
+        if invalid_mask.any():
+            invalid_values = (
+                df.loc[
+                    invalid_mask,
+                    column,
+                ]
+                .unique()
+                .tolist()
             )
 
+            raise ValueError(
+                f"{column}은 0과 1 또는 결측값만 "
+                f"포함해야 합니다. 현재 값: {invalid_values}"
+            )
 
 # ============================================================
 # 기본 데이터 품질 표
@@ -423,7 +435,7 @@ def build_education_income_summary(
     aggregation: dict[str, tuple[str, str]] = {
         "sample_size": (
             "high_income",
-            "size",
+            "count",
         ),
         "high_income_count": (
             "high_income",
@@ -632,11 +644,44 @@ def build_eda_summary(
     )
 
     total_rows = len(df)
-    high_income_count = int(
-        df["high_income"].sum()
+    valid_income_count = int(
+        df["high_income"].count()
     )
+
+    high_income_count = int(
+        df["high_income"]
+        .eq(1)
+        .sum()
+    )
+
+    low_income_count = int(
+        df["high_income"]
+        .eq(0)
+        .sum()
+    )
+
+    missing_income_count = (
+        total_rows - valid_income_count
+    )
+    
+    valid_degree_count = int(
+        df["college_degree"].count()
+    )
+
     college_degree_count = int(
-        df["college_degree"].sum()
+        df["college_degree"]
+        .eq(1)
+        .sum()
+    )
+
+    no_college_degree_count = int(
+        df["college_degree"]
+        .eq(0)
+        .sum()
+    )
+
+    missing_degree_count = (
+        total_rows - valid_degree_count
     )
 
     top_education_records = (
@@ -695,34 +740,47 @@ def build_eda_summary(
             ),
         },
         "target_distribution": {
+            "valid_income_count": (
+                valid_income_count
+            ),
+            "missing_income_count": (
+                missing_income_count
+            ),
             "high_income_count": (
                 high_income_count
             ),
             "high_income_rate": (
-                high_income_count / total_rows
-                if total_rows
+                high_income_count
+                / valid_income_count
+                if valid_income_count
                 else 0.0
             ),
             "low_income_count": (
-                total_rows
-                - high_income_count
+                low_income_count
             ),
         },
+
         "college_degree_distribution": {
+            "valid_degree_count": (
+                valid_degree_count
+            ),
+            "missing_degree_count": (
+                missing_degree_count
+            ),
             "college_degree_count": (
                 college_degree_count
             ),
             "college_degree_rate": (
                 college_degree_count
-                / total_rows
-                if total_rows
+                / valid_degree_count
+                if valid_degree_count
                 else 0.0
             ),
             "no_college_degree_count": (
-                total_rows
-                - college_degree_count
+                no_college_degree_count
             ),
         },
+        
         "unadjusted_association": {
             "college_degree_high_income_rate": (
                 degree_rate
@@ -834,8 +892,8 @@ def _json_default(value: Any) -> Any:
 
 def _eda_summary_paths() -> tuple[Path, Path]:
     """
-    현재 config.py가 CSV 경로를 사용해도 팀 계약의
-    eda_summary.json을 함께 생성하도록 경로를 정한다.
+    config.py의 EDA JSON 경로를 기준으로
+    JSON 요약과 보조 CSV 요약 경로를 생성한다.
     """
 
     configured_path = Path(
@@ -978,7 +1036,6 @@ def run_eda(
     df: pd.DataFrame | None = None,
     *,
     data_path: str | Path = RAW_DATA_PATH,
-    backend: Backend = "auto",
     save_output: bool = True,
 ) -> dict[str, Any]:
     """

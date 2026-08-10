@@ -63,7 +63,7 @@ def plot_model_metrics() -> None:
     plt.figure(figsize=(7, 5))
     ax = sns.barplot(data=metrics_table, x="metric", y="score", hue="metric", legend=False)
     ax.set(title="Income prediction model performance", xlabel="Metric", ylabel="Score")
-    ax.set_ylim(0, 1)
+    ax.set_ylim(0, 1.08)
     for patch, value in zip(ax.patches, metrics_table["score"]):
         bar = cast(Rectangle, patch)
         ax.text(
