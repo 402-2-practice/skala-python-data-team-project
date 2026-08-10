@@ -711,6 +711,15 @@ def load_benchmark_result() -> dict[str, object] | None:
     }:
         return None
 
+    required_keys = {
+        "selected_engine",
+        "pandas_median_seconds",
+        "polars_median_seconds",
+    }
+
+    if not required_keys.issubset(comparison):
+        return None
+    
     return comparison
 
 # ============================================================
@@ -909,10 +918,7 @@ def run_data_pipeline(
         save_processed_data(cleaned_df)
 
         # 새 벤치마크를 수행했을 때만 결과 파일을 갱신한다.
-        if (
-            benchmark_was_created
-            or backend != "auto"
-        ):
+        if benchmark_was_created:
             save_benchmark_result(
                 comparison
             )
