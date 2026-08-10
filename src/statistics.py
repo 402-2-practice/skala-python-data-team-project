@@ -69,8 +69,17 @@ def _validate_columns(df: pd.DataFrame, required: list[str], analysis_name: str)
 
 def _validate_binary_groups(df: pd.DataFrame, treatment: str, outcome: str) -> None:
     """처리변수와 결과변수가 PSM에 필요한 0/1 구조인지 확인한다."""
-    treatment_values = set(df[treatment].dropna().astype(int).unique())
-    outcome_values = set(df[outcome].dropna().astype(int).unique())
+    treatment_series = pd.to_numeric(
+        df[treatment].dropna(),
+        errors="raise",
+    )
+
+    outcome_series = pd.to_numeric(
+        df[outcome].dropna(),
+        errors="raise",
+        )
+    treatment_values = set(treatment_series.unique())
+    outcome_values = set(outcome_series.unique())
     if treatment_values != {0, 1}:
         raise ValueError(f"{treatment}은 0과 1 두 집단을 모두 포함해야 합니다: {treatment_values}")
     if not outcome_values.issubset({0, 1}):
@@ -218,9 +227,24 @@ def _smd_table(
         )
         treated = encoded[encoded["college_degree"] == 1].drop(columns="college_degree")
         control = encoded[encoded["college_degree"] == 0].drop(columns="college_degree")
+        treated_mean = treated.mean()
+        control_mean = control.mean()
+
+        mean_diff = treated_mean - control_mean
         pooled_sd = np.sqrt((treated.var(ddof=1) + control.var(ddof=1)) / 2)
-        smd = (treated.mean() - control.mean()) / pooled_sd.replace(0, np.nan)
-        return smd.fillna(0).abs()
+        smd = mean_diff.abs() / pooled_sd
+
+        zero_sd = pooled_sd == 0
+
+        smd.loc[
+            zero_sd & (mean_diff.abs() == 0)
+        ] = 0.0
+
+        smd.loc[
+            zero_sd & (mean_diff.abs() > 0)
+        ] = np.inf
+
+        return smd
 
     return (
         pd.concat(
@@ -376,7 +400,22 @@ def propensity_score_matching(
 
     matched_degree = matched.loc[matched["matched_role"] == "degree", "high_income"].astype(float)
     matched_control = matched.loc[matched["matched_role"] == "no_degree", "high_income"].astype(float)
-    statistic, p_value = ttest_ind(matched_degree, matched_control, equal_var=False)
+    paired = (
+        matched
+        .pivot(
+            index="pair_id",
+            columns="matched_role",
+            values="high_income",
+        )
+        .dropna()
+    )
+    
+    from scipy.stats import ttest_rel
+
+    statistic, p_value = ttest_rel(
+        paired["degree"].astype(float),
+        paired["no_degree"].astype(float),
+    )
     matched_pairs = int(len(matched) / 2)
     control_sources = matched.loc[matched["matched_role"] == "no_degree", "source_index"]
     unique_controls = int(control_sources.nunique())
