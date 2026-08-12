@@ -133,7 +133,7 @@ def _odds_ratio(degree: pd.Series, no_degree: pd.Series) -> float:
 # TASK 2. 매칭 전 집단 비교 및 Welch t-test
 # ============================================================
 
-def welch_test(df: pd.DataFrame, outcome: str = "high_income") -> dict:
+def welch_test(df: pd.DataFrame, treatment: str = "college_degree", outcome: str = "high_income") -> dict:
     """학위·비학위 집단의 고소득률 차이를 Welch t-test로 검정한다.
 
     Args:
@@ -148,18 +148,18 @@ def welch_test(df: pd.DataFrame, outcome: str = "high_income") -> dict:
         과제 요구사항에 따라 이진 결과에 `ttest_ind(equal_var=False)`를 사용한다.
         이 결과는 매칭 전 단순 비교이므로 인과효과로 해석하지 않는다.
     """
-    _validate_columns(df, ["college_degree", outcome], "Welch t-test")
-    _validate_binary_groups(df, "college_degree", outcome)
-    no_degree = df.loc[df["college_degree"] == 0, outcome].dropna().astype(float)
-    degree = df.loc[df["college_degree"] == 1, outcome].dropna().astype(float)
-    if len(no_degree) < 2 or len(degree) < 2:
+    _validate_columns(df, [treatment, outcome], "Welch t-test")
+    _validate_binary_groups(df, treatment, outcome)
+    control = df.loc[df[treatment] == 0, outcome].dropna().astype(float)
+    treated = df.loc[df[treatment] == 1, outcome].dropna().astype(float)
+    if len(control) < 2 or len(treated) < 2:
         raise ValueError("Welch t-test에는 집단별로 최소 2개 표본이 필요합니다.")
 
-    statistic, p_value = ttest_ind(degree, no_degree, equal_var=False)
-    difference = float(degree.mean() - no_degree.mean())
-    ci_low, ci_high = _difference_confidence_interval(degree, no_degree)
-    no_degree_rate = float(no_degree.mean())
-    degree_rate = float(degree.mean())
+    statistic, p_value = ttest_ind(treated, control, equal_var=False)
+    difference = float(treated.mean() - control.mean())
+    ci_low, ci_high = _difference_confidence_interval(treated, control)
+    no_degree_rate = float(control.mean())
+    degree_rate = float(treated.mean())
     risk_ratio = float(degree_rate / no_degree_rate) if no_degree_rate > 0 else None
     cohens_h = float(
         2 * np.arcsin(np.sqrt(degree_rate))
@@ -168,15 +168,24 @@ def welch_test(df: pd.DataFrame, outcome: str = "high_income") -> dict:
     significant = bool(np.isfinite(p_value) and p_value < 0.05)
     result = {
         "outcome": outcome,
-        "no_degree_n": int(len(no_degree)),
-        "degree_n": int(len(degree)),
-        "no_degree_mean": no_degree_rate,
-        "degree_mean": degree_rate,
+        "treatment": treatment,
+        "outcome": outcome,
+
+        "treated_n": int(len(treated)),
+        "control_n": int(len(control)),
+
+        "treated_mean": float(
+            treated.mean()
+        ),
+
+        "control_mean": float(
+            control.mean()
+        ),
         "mean_difference": difference,
         "difference_ci_95_low": float(ci_low),
         "difference_ci_95_high": float(ci_high),
         "risk_ratio": risk_ratio,
-        "odds_ratio": _odds_ratio(degree, no_degree),
+        "odds_ratio": _odds_ratio(treated, control),
         "cohens_h": cohens_h,
         "t_statistic": float(statistic),
         "p_value": float(p_value),
@@ -264,6 +273,8 @@ def _smd_table(
 
 def propensity_score_matching(
     df: pd.DataFrame,
+    treatment: str = "college_degree",
+    outcome: str = "high_income",
     numeric_covariates: list[str] | None = None,
     categorical_covariates: list[str] | None = None,
     output_prefix: str = "psm",
@@ -295,14 +306,14 @@ def propensity_score_matching(
     numeric_covariates = list(numeric_covariates or PSM_NUMERIC_COVARIATES)
     categorical_covariates = list(categorical_covariates or PSM_CATEGORICAL_COVARIATES)
     columns = [
-        "college_degree",
-        "high_income",
+        treatment,
+        outcome,
         *numeric_covariates,
         *categorical_covariates,
     ]
     _validate_columns(df, columns, "성향점수매칭")
-    _validate_binary_groups(df, "college_degree", "high_income")
-    analysis = df[columns].dropna(subset=["college_degree", "high_income"]).copy()
+    _validate_binary_groups(df, treatment, outcome)
+    analysis = df[columns].dropna(subset=[treatment, outcome]).copy()
     # sklearn 버전별 pd.NA 처리 차이를 피하기 위해 범주형 결측치를 np.nan으로 통일한다.
     for column in categorical_covariates:
         analysis[column] = analysis[column].astype(object).where(analysis[column].notna(), np.nan)
@@ -330,11 +341,11 @@ def propensity_score_matching(
     )
 
     covariates = numeric_covariates + categorical_covariates
-    propensity_model.fit(analysis[covariates], analysis["college_degree"])
+    propensity_model.fit(analysis[covariates], analysis[treatment])
     analysis["propensity_score"] = propensity_model.predict_proba(analysis[covariates])[:, 1]
 
-    treated = analysis[analysis["college_degree"] == 1].copy()
-    control = analysis[analysis["college_degree"] == 0].copy()
+    treated = analysis[analysis[treatment] == 1].copy()
+    control = analysis[analysis[treatment] == 0].copy()
     treated_before_support = len(treated)
     control_before_support = len(control)
 
@@ -382,14 +393,14 @@ def propensity_score_matching(
                         "source_index": treated_row.name,
                         "match_distance": selected_distance,
                         "pair_id": len(pairs) // 2,
-                        "matched_role": "degree",
+                        "matched_role": "treated",
                     },
                     {
                         **control_row.to_dict(),
                         "source_index": control_row.name,
                         "match_distance": selected_distance,
                         "pair_id": len(pairs) // 2,
-                        "matched_role": "no_degree",
+                        "matched_role": "control",
                     },
                 ]
             )
@@ -405,7 +416,7 @@ def propensity_score_matching(
         .pivot(
             index="pair_id",
             columns="matched_role",
-            values="high_income",
+            values=outcome,
         )
         .dropna()
     )
@@ -413,11 +424,11 @@ def propensity_score_matching(
     from scipy.stats import ttest_rel
 
     statistic, p_value = ttest_rel(
-        paired["degree"].astype(float),
-        paired["no_degree"].astype(float),
+        paired["treated"].astype(float),
+        paired["control"].astype(float),
     )
     matched_pairs = int(len(matched) / 2)
-    control_sources = matched.loc[matched["matched_role"] == "no_degree", "source_index"]
+    control_sources = matched.loc[matched["matched_role"] == "control", "source_index"]
     unique_controls = int(control_sources.nunique())
     max_control_reuse = int(control_sources.value_counts().max())
     result = {
@@ -515,10 +526,12 @@ def run_statistics(df: pd.DataFrame) -> tuple[dict, dict]:
     print("\n[통계] 수치형 변수 간 상관계수 행렬:")
     print(numeric.corr().to_string())
 
-    test_result = welch_test(df)
-    _, psm_result = propensity_score_matching(df, output_prefix="psm")
+    test_result = welch_test(df, treatment="college_degree", outcome="high_income",)
+    _, psm_result = propensity_score_matching(df, treatment="college_degree", outcome="high_income", output_prefix="psm")
     _, sensitivity_result = propensity_score_matching(
         df,
+        treatment="college_degree",
+        outcome="high_income",
         numeric_covariates=SENSITIVITY_NUMERIC_COVARIATES,
         categorical_covariates=SENSITIVITY_CATEGORICAL_COVARIATES,
         output_prefix="psm_sensitivity",

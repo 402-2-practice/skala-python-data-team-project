@@ -95,8 +95,8 @@ def generate_report() -> None:
 
 ## 매칭 전 비교
 
-- 비학위 집단 고소득률: {test['no_degree_mean']:.2%}
-- 학위 집단 고소득률: {test['degree_mean']:.2%}
+- 비학위 집단 고소득률: {test['control_mean']:.2%}
+- 학위 집단 고소득률: {test['treated_mean']:.2%}
 - 단순 비율 차이: {test['mean_difference'] * 100:.2f}%p
 - p-value: {test['p_value_display']}
 
