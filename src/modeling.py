@@ -482,6 +482,62 @@ def train_income_model(df: pd.DataFrame) -> dict:
 
     return evaluation.metrics
 
+def predict_income_input(
+    user_input: dict,
+) -> dict:
+    """웹/API에서 전달된 한 사람의 입력값으로 고소득 확률을 예측한다.
+
+    기존 predict_income()의 DataFrame 추론 로직을 그대로 재사용하고,
+    웹에서 사용하기 쉬운 dict 형태로 결과를 반환한다.
+
+    주의:
+        반환되는 probability는 머신러닝 모델의 예측값이며,
+        특정 변수의 인과효과나 조정된 연관성을 의미하지 않는다.
+    """
+
+    if not isinstance(user_input, dict):
+        raise ModelingError(
+            "user_input은 dict 형태여야 합니다."
+        )
+
+    if not user_input:
+        raise ModelingError(
+            "예측에 사용할 입력값이 없습니다."
+        )
+
+    input_df = pd.DataFrame(
+        [user_input]
+    )
+
+    prediction = predict_income(
+        input_df
+    )
+
+    predicted_class = int(
+        prediction.iloc[0][
+            "prediction"
+        ]
+    )
+
+    probability = float(
+        prediction.iloc[0][
+            "probability"
+        ]
+    )
+
+    return {
+        "prediction": predicted_class,
+        "high_income_probability": probability,
+        "prediction_label": (
+            ">50K"
+            if predicted_class == 1
+            else "<=50K"
+        ),
+        "interpretation_note": (
+            "이 값은 학습된 머신러닝 모델의 예측 확률이며 "
+            "개별 변수의 인과효과를 의미하지 않습니다."
+        ),
+    }
 
 def predict_income(df: pd.DataFrame) -> pd.DataFrame:
     """저장된 income_pipeline.joblib으로 새 데이터의 예측값/확률을 반환한다.
@@ -513,9 +569,52 @@ def predict_income(df: pd.DataFrame) -> pd.DataFrame:
     X = _coerce_feature_dtypes(X, categorical_columns)
 
     try:
-        pipeline: Pipeline = joblib.load(model_path)
+        pipeline: Pipeline = joblib.load(
+            model_path
+        )
     except Exception as exc:
-        raise ModelingError(f"파이프라인을 불러오는 데 실패했습니다: {exc}") from exc
+        raise ModelingError(
+            f"파이프라인을 불러오는 데 실패했습니다: {exc}"
+        ) from exc
+
+
+    # 학습 당시 사용한 피처 목록을 기준으로
+    # 새 입력 데이터의 스키마를 검증한다.
+    expected_columns = list(
+        pipeline.feature_names_in_
+    )
+
+    missing_columns = [
+        column
+        for column in expected_columns
+        if column not in df.columns
+    ]
+
+    if missing_columns:
+        raise ModelingError(
+            "예측에 필요한 입력 변수가 없습니다: "
+            f"{missing_columns}"
+        )
+
+
+    # 입력 데이터에 불필요한 컬럼이 있더라도
+    # 학습 당시 사용한 피처만 정확한 순서로 선택한다.
+    X = (
+        df[expected_columns]
+        .copy()
+    )
+
+    categorical_columns = (
+        X
+        .select_dtypes(exclude="number")
+        .columns
+        .tolist()
+    )
+
+    X = _coerce_feature_dtypes(
+        X,
+        categorical_columns,
+    )
 
     try:
         prediction = pipeline.predict(X)
