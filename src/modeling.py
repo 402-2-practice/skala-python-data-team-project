@@ -151,6 +151,7 @@ def _split_features(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, list[str
     수치형/범주형으로 분류해서 함께 반환한다.
     """
     feature_columns = [column for column in df.columns if column not in EXCLUDED_COLUMNS]
+    model_df = (df.dropna(subset=[TARGET_COLUMN]).copy())
     X = df[feature_columns].copy()
     y = df[TARGET_COLUMN].astype(int)
 
@@ -454,6 +455,17 @@ def train_income_model(df: pd.DataFrame) -> dict:
     """main.py 진입점. 반환값(dict)의 키(accuracy/precision/recall/f1/roc_auc)는
     src/report.py가 model_metrics.json에서 그대로 읽으므로 이름을 바꾸지 않는다.
     """
+
+    """target 결측 제거"""
+    model_df = (
+        df
+        .dropna(subset=[TARGET_COLUMN])
+        .copy()
+        .reset_index(drop=True)
+    )
+    X, y, numeric_columns, categorical_columns = (
+        _split_features(model_df)
+    )
     evaluation = evaluate_income_model(df)
     _save_outputs(evaluation)
 

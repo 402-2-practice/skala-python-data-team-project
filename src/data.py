@@ -221,15 +221,39 @@ def _valid_pandas_rows(
     df: pd.DataFrame,
 ) -> pd.Series:
     """논리적으로 유효한 행을 판별한다."""
+    """결측은 유지하고, 값이 존재하는 경우에만 유효 범위를 검사한다."""
 
     return (
-        df["age"].between(1, 120)
-        & df["hours-per-week"].between(1, 168)
-        & df["education-num"].between(1, 20)
-        & df["fnlwgt"].gt(0)
-        & df["capital-gain"].ge(0)
-        & df["capital-loss"].ge(0)
-        & df["income"].isin(VALID_INCOME_LABELS)
+        (
+            df["age"].isna()
+            | df["age"].between(1, 120)
+        )
+        & (
+            df["hours-per-week"].isna()
+            | df["hours-per-week"].between(1, 168)
+        )
+        & (
+            df["education-num"].isna()
+            | df["education-num"].between(1, 20)
+        )
+        & (
+            df["fnlwgt"].isna()
+            | df["fnlwgt"].gt(0)
+        )
+        & (
+            df["capital-gain"].isna()
+            | df["capital-gain"].ge(0)
+        )
+        & (
+            df["capital-loss"].isna()
+            | df["capital-loss"].ge(0)
+        )
+        & (
+            df["income"].isna()
+            | df["income"].isin(
+                VALID_INCOME_LABELS
+            )
+        )
     )
 
 
@@ -242,16 +266,8 @@ def clean_with_pandas(
 
     initial_rows = len(result)
 
-    rows_before_missing = len(result)
-
-    result = (
-        result
-        .dropna()
-        .reset_index(drop=True)
-    )
-
-    missing_removed = (
-        rows_before_missing - len(result)
+    rows_with_missing = int(
+    result.isna().any(axis=1).sum()
     )
 
     rows_before_duplicates = len(result)
@@ -279,16 +295,31 @@ def clean_with_pandas(
         .reset_index(drop=True)
     )
 
+    """high_income, education 결측 보존"""
     result["high_income"] = (
         result["income"]
-        .eq(">50K")
-        .astype("int8")
+        .map(
+            {
+                "<=50K": 0,
+                ">50K": 1,
+            }
+        )
+        .astype("Int8")
+    )
+
+    college_degree = (
+        result["education"]
+        .isin(COLLEGE_DEGREES)
+        .astype("Int8")
+    )
+
+    college_degree = college_degree.mask(
+        result["education"].isna(),
+        pd.NA,
     )
 
     result["college_degree"] = (
-        result["education"]
-        .isin(COLLEGE_DEGREES)
-        .astype("int8")
+        college_degree
     )
 
     cleaning_info = {
@@ -350,19 +381,38 @@ def _normalize_polars_strings(
 
 def _valid_polars_rows() -> pl.Expr:
     """논리적으로 유효한 Polars 행 조건을 반환한다."""
+    """결측은 유지하고, 값이 존재하는 경우에만 유효 범위를 검사한다."""
 
     return (
-        (pl.col("age") >= 1)
-        & (pl.col("age") <= 120)
-        & (pl.col("hours-per-week") >= 1)
-        & (pl.col("hours-per-week") <= 168)
-        & (pl.col("education-num") >= 1)
-        & (pl.col("education-num") <= 20)
-        & (pl.col("fnlwgt") > 0)
-        & (pl.col("capital-gain") >= 0)
-        & (pl.col("capital-loss") >= 0)
-        & pl.col("income").is_in(
-            list(VALID_INCOME_LABELS)
+        (
+            pl.col("age").is_null()
+            | pl.col("age").is_between(1, 120)
+        )
+        & (
+            pl.col("hours-per-week").is_null()
+            | pl.col("hours-per-week").is_between(1, 168)
+        )
+        & (
+            pl.col("education-num").is_null()
+            | pl.col("education-num").is_between(1, 20)
+        )
+        & (
+            pl.col("fnlwgt").is_null()
+            | (pl.col("fnlwgt") > 0)
+        )
+        & (
+            pl.col("capital-gain").is_null()
+            | (pl.col("capital-gain") >= 0)
+        )
+        & (
+            pl.col("capital-loss").is_null()
+            | (pl.col("capital-loss") >= 0)
+        )
+        & (
+            pl.col("income").is_null()
+            | pl.col("income").is_in(
+                list(VALID_INCOME_LABELS)
+            )
         )
     )
 
@@ -377,8 +427,6 @@ def clean_with_polars(
     initial_rows = result.height
 
     rows_before_missing = result.height
-
-    result = result.drop_nulls()
 
     missing_removed = (
         rows_before_missing - result.height
@@ -430,6 +478,38 @@ def clean_with_polars(
 
     return result, cleaning_info
 
+# ============================================================
+# 실제 사용 열 결측치 처리
+# ============================================================
+
+def prepare_analysis_data(
+    df: pd.DataFrame,
+    required_columns: list[str],
+) -> pd.DataFrame:
+    """해당 분석에서 실제로 사용하는 열에 대해서만 결측 행을 제거한다."""
+
+    missing_columns = [
+        column
+        for column in required_columns
+        if column not in df.columns
+    ]
+
+    if missing_columns:
+        raise ValueError(
+            "분석에 필요한 열이 없습니다: "
+            f"{missing_columns}"
+        )
+
+    unique_columns = list(
+        dict.fromkeys(required_columns)
+    )
+
+    return (
+        df[unique_columns]
+        .dropna()
+        .copy()
+        .reset_index(drop=True)
+    )
 
 # ============================================================
 # 결과 변환 및 일치 검증
