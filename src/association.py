@@ -818,17 +818,23 @@ def analyze_association(
     )
 
     return {
-        "target": request.target,
-        "exposure": request.exposure,
-        "controls": list(
-            request.controls
-        ),
-        "exposure_type": exposure_type,
-        "sample_size": int(
-            len(analysis_df)
-        ),
-        "unadjusted": unadjusted,
-        "adjusted": adjusted,
+        "request": {
+            "target": request.target,
+            "exposure": request.exposure,
+            "controls": list(
+                request.controls
+            ),
+        },
+
+        "analysis": {
+            "exposure_type": exposure_type,
+            "sample_size": int(
+                len(analysis_df)
+            ),
+            "unadjusted": unadjusted,
+            "adjusted": adjusted,
+        },
+
         "interpretation_note": (
             "통제변수를 포함한 결과는 관측된 변수들을 조정한 "
             "조건부 연관성을 의미하며 확정적인 인과효과를 의미하지 않는다."

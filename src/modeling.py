@@ -526,15 +526,22 @@ def predict_income_input(
     )
 
     return {
-        "prediction": predicted_class,
-        "high_income_probability": probability,
-        "prediction_label": (
-            ">50K"
-            if predicted_class == 1
-            else "<=50K"
+        "input": dict(
+            user_input
         ),
+
+        "prediction": {
+            "predicted_class": predicted_class,
+            "prediction_label": (
+                ">50K"
+                if predicted_class == 1
+                else "<=50K"
+            ),
+            "high_income_probability": probability,
+        },
+
         "interpretation_note": (
-            "이 값은 학습된 머신러닝 모델의 예측 확률이며 "
+            "이 결과는 학습된 머신러닝 모델의 예측값이며 "
             "개별 변수의 인과효과를 의미하지 않습니다."
         ),
     }
