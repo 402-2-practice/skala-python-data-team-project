@@ -277,16 +277,14 @@ def propensity_score_matching(
     outcome: str = "high_income",
     numeric_covariates: list[str] | None = None,
     categorical_covariates: list[str] | None = None,
-    output_prefix: str = "psm",
     with_replacement: bool = False,
-) -> tuple[pd.DataFrame, dict]:
+) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
     """성향점수를 이용해 학위 집단과 유사한 비학위 대조군을 매칭한다.
 
     Args:
         df: 처리변수, 결과변수와 매칭 공변량을 포함한 정제 데이터.
         numeric_covariates: 성향점수에 사용할 수치형 공변량.
         categorical_covariates: 성향점수에 사용할 범주형 공변량.
-        output_prefix: CSV·JSON 결과 파일명에 사용할 접두사.
         with_replacement: True면 같은 대조군의 반복 매칭을 허용한다. 기본값은
             표본 독립성과 해석 가능성을 높이기 위해 False다.
 
@@ -409,8 +407,8 @@ def propensity_score_matching(
     if matched.empty:
         raise RuntimeError("caliper 안에서 매칭된 표본이 없습니다.")
 
-    matched_degree = matched.loc[matched["matched_role"] == "degree", "high_income"].astype(float)
-    matched_control = matched.loc[matched["matched_role"] == "no_degree", "high_income"].astype(float)
+    matched_degree = matched.loc[matched["matched_role"] == "treated", "high_income"].astype(float)
+    matched_control = matched.loc[matched["matched_role"] == "control", "high_income"].astype(float)
     paired = (
         matched
         .pivot(
@@ -451,7 +449,7 @@ def propensity_score_matching(
         "control_reuse_rate": float(1 - unique_controls / matched_pairs),
         "max_control_reuse_count": max_control_reuse,
         "mean_match_distance": float(
-            matched.loc[matched["matched_role"] == "degree", "match_distance"].mean()
+            matched.loc[matched["matched_role"] == "treated", "match_distance"].mean()
         ),
         "common_support_lower": float(lower),
         "common_support_upper": float(upper),
@@ -491,12 +489,7 @@ def propensity_score_matching(
         else "일부 공변량의 매칭 후 절대 SMD가 0.1 이상이므로 인과적 해석을 보류해야 한다."
     )
 
-    matched.to_csv(TABLE_DIR / f"{output_prefix}_matched_sample.csv", index=False)
-    balance.to_csv(TABLE_DIR / f"{output_prefix}_balance.csv", index=False)
-    (TABLE_DIR / f"{output_prefix}_result.json").write_text(
-        json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    return matched, result
+    return matched, balance, result
 
 
 # ============================================================
@@ -527,14 +520,13 @@ def run_statistics(df: pd.DataFrame) -> tuple[dict, dict]:
     print(numeric.corr().to_string())
 
     test_result = welch_test(df, treatment="college_degree", outcome="high_income",)
-    _, psm_result = propensity_score_matching(df, treatment="college_degree", outcome="high_income", output_prefix="psm")
-    _, sensitivity_result = propensity_score_matching(
+    _, _, psm_result = propensity_score_matching(df, treatment="college_degree", outcome="high_income")
+    _, _, sensitivity_result = propensity_score_matching(
         df,
         treatment="college_degree",
         outcome="high_income",
         numeric_covariates=SENSITIVITY_NUMERIC_COVARIATES,
         categorical_covariates=SENSITIVITY_CATEGORICAL_COVARIATES,
-        output_prefix="psm_sensitivity",
     )
     combined_summary = {
         "analysis_question": (

@@ -41,6 +41,7 @@ TABLE_DIR = OUTPUT_DIR / "tables"
 
 MODEL_DIR = OUTPUT_DIR / "models"
 
+ANALYSIS_RUN_DIR = OUTPUT_DIR / "runs"
 
 # ============================================================
 # 파일 경로
@@ -51,11 +52,6 @@ RAW_DATA_PATH = RAW_DIR / "adult.csv"
 PROCESSED_DATA_PATH = (
     PROCESSED_DIR / "adult_cleaned.csv"
 )
-
-REPORT_PATH = (
-    BASE_DIR / "report.md"
-)
-
 
 # ============================================================
 # EDA 결과

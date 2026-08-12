@@ -23,12 +23,6 @@ def main() -> None:
     args = parser.parse_args()
     ensure_directories()
 
-    if args.stage == "report":
-        from src.report import generate_report
-
-        generate_report()
-        return
-
     if not args.data.exists():
         raise FileNotFoundError(
             f"데이터 파일이 없습니다: {args.data}\n"
@@ -55,10 +49,6 @@ def main() -> None:
 
         train_income_model(df)
         create_model_visualizations()
-    if args.stage == "all":
-        from src.report import generate_report
-
-        generate_report()
 
 
 if __name__ == "__main__":
