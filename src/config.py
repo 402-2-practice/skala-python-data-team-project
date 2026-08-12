@@ -1,8 +1,4 @@
-"""프로젝트 공통 경로·설정 상수.
-
-담당: 윤찬웅 (데이터·EDA, 공통 설정 기본 소유자) — docs/TEAM_WORKFLOW.md 공통 기능 소유권 참고.
-열 이름을 추가·삭제·변경하는 PR은 최소 두 명이 리뷰한다.
-"""
+"""프로젝트 공통 경로·설정 상수."""
 
 from pathlib import Path
 
@@ -11,93 +7,32 @@ from pathlib import Path
 # 프로젝트 기본 경로
 # ============================================================
 
-#config.py가 src 폴더 안에 있다는 전제에서 프로젝트 루트 경로를 계산한다.
+#src/config.py 기준 프로젝트 루트
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-# ============================================================
-# 데이터 경로
-# ============================================================
-
-#raw 폴더의 원본 데이터는 수정하지 않고, 정제 결과는 processed 폴더에 별도로 저장한다.
-
 DATA_DIR = BASE_DIR / "data"
-
 RAW_DIR = DATA_DIR / "raw"
-
 PROCESSED_DIR = DATA_DIR / "processed"
 
-
-# ============================================================
-# 결과물 경로
-# ============================================================
-
 OUTPUT_DIR = BASE_DIR / "outputs"
-
 FIGURE_DIR = OUTPUT_DIR / "figures"
-
 TABLE_DIR = OUTPUT_DIR / "tables"
-
 MODEL_DIR = OUTPUT_DIR / "models"
 
-ANALYSIS_RUN_DIR = OUTPUT_DIR / "runs"
-
 # ============================================================
-# 파일 경로
+# 데이터 파일 경로
 # ============================================================
 
 RAW_DATA_PATH = RAW_DIR / "adult.csv"
+PROCESSED_DATA_PATH = (PROCESSED_DIR / "adult_cleaned.csv")
 
-PROCESSED_DATA_PATH = (
-    PROCESSED_DIR / "adult_cleaned.csv"
-)
-
-# ============================================================
-# EDA 결과
-# ============================================================
-
-#EDA_SUMMARY_PATH:
-# 전체 표본 수, 컬럼 수, 고소득 비율, 대학 학위 비율 등 핵심 요약 저장
-
-# MISSING_VALUES_PATH:
-# 컬럼별 결측값 개수와 비율 저장
-
-# DUPLICATE_RESULT_PATH:
-# 중복 제거 전후 행 수와 제거된 행 수 저장
-
-# DESCRIPTIVE_STATS_PATH:
-# 수치형 변수의 평균, 표준편차, 분위수 등 기술통계 저장
-
-EDA_SUMMARY_PATH = (
-    TABLE_DIR / "eda_summary.json"
-)
-
-MISSING_VALUES_PATH = (
-    TABLE_DIR / "missing_values.csv"
-)
-
-DUPLICATE_RESULT_PATH = (
-    TABLE_DIR / "duplicate_result.csv"
-)
-
-DESCRIPTIVE_STATS_PATH = (
-    TABLE_DIR / "descriptive_stats.csv"
-)
-
-# Pandas/Polars 성능 비교 결과
-BENCHMARK_RESULT_PATH = (
-    TABLE_DIR / "data_engine_benchmark.json"
-)
+CSV_HAS_HEADER = True
 
 # ============================================================
 # Adult Census Income 컬럼
 # ============================================================
 
-# 원본 adult.csv는 첫 번째 행에 15개 컬럼명이 포함되어 있다.
-CSV_HAS_HEADER = True
-
-# CSV 헤더가 프로젝트의 Adult 데이터 계약과 일치하는지 검증할 때 사용한다.
 ADULT_COLUMNS = [
     "age",
     "workclass",
@@ -116,6 +51,59 @@ ADULT_COLUMNS = [
     "income",
 ]
 
+RAW_TARGET_COLUMN = "income"
+TARGET_COLUMN = "high_income"
+
+# ============================================================
+# 사용자 연관성 분석 변수
+# ============================================================
+
+# 홈페이지에서 관심 변수 또는 통제 변수로 선택할 수 있는 변수와
+# 연관성 분석 시 사용할 변수 유형을 명시한다.
+# fnlwgt:Census 표본 가중치이므로 사용자 분석 변수에서 제외한다.
+# education-num:education의 숫자 표현으로 정보가 중복되므로 제외한다.
+# income / high_income:결과변수이므로 설명변수로 사용할 수 없다.
+
+ANALYSIS_VARIABLE_TYPES = {
+    "age": "continuous",
+    "workclass": "categorical",
+    "education": "categorical",
+    "marital-status": "categorical",
+    "occupation": "categorical",
+    "relationship": "categorical",
+    "race": "categorical",
+    "sex": "binary",
+    "capital-gain": "continuous",
+    "capital-loss": "continuous",
+    "hours-per-week": "continuous",
+    "native-country": "categorical",
+}
+
+ANALYSIS_VARIABLES = tuple(ANALYSIS_VARIABLE_TYPES.keys())
+
+# ============================================================
+# 고소득 예측 변수
+# ============================================================
+
+# 사용자 입력을 받아 고소득 확률을 예측할 때 사용하는 피처.
+# income / high_income:정답 변수이므로 제외한다.
+# education-num:education과 중복되므로 제외한다.
+# fnlwgt:Census 표본 가중치이며 개인의 실질적 특성이 아니므로 제외한다.
+
+PREDICTION_FEATURE_COLUMNS = [
+    "age",
+    "workclass",
+    "education",
+    "marital-status",
+    "occupation",
+    "relationship",
+    "race",
+    "sex",
+    "capital-gain",
+    "capital-loss",
+    "hours-per-week",
+    "native-country",
+]
 
 # ============================================================
 # 공통 설정
@@ -123,24 +111,6 @@ ADULT_COLUMNS = [
 
 #데이터 분할, PSM, 머신러닝 모델의 결과를 재현하기 위한 공통 난수 시드이다.
 RANDOM_STATE = 42
-
-
-# ============================================================
-# 분석 기준
-# ============================================================
-
-# education 값이 아래 학위 목록에 포함되면 college_degree를 1로 생성한다.
-# frozenset을 사용해 실행 중 학위 기준이 변경되지 않도록 한다.
-
-COLLEGE_DEGREES = frozenset(
-    {
-        "Bachelors",
-        "Masters",
-        "Prof-school",
-        "Doctorate",
-    }
-)
-
 
 # ============================================================
 # 필요한 디렉터리 생성
@@ -150,7 +120,7 @@ COLLEGE_DEGREES = frozenset(
 #이미 존재하는 폴더는 유지하며, main.py 시작 시 한 번 호출한다.
 
 def ensure_directories() -> None:
-
+    
     for directory in [
         RAW_DIR,
         PROCESSED_DIR,
@@ -158,5 +128,4 @@ def ensure_directories() -> None:
         TABLE_DIR,
         MODEL_DIR,
     ]:
-
         directory.mkdir(parents=True, exist_ok=True)
